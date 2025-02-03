@@ -1,4 +1,4 @@
-﻿-- Add in Pipelines for Ingest RiskReg
+﻿-- Add in Pipelines for Ingest RiskReg...
 
 DECLARE @RiskRegIngestPipeline 	VARCHAR(100) 	= 'PL_xxxx_SQL_To_Bronze'
 ,		@RiskRegCleansePipeline 	VARCHAR(100) 	= 'PL_RiskReg_Bronze_To_Silver'
