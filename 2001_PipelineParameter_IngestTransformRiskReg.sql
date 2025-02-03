@@ -1,4 +1,4 @@
-﻿-- Add in initial Pipeline Params for Ingest RiskReg
+﻿-- Add in initial Pipeline Params for Ingest RiskReg..
 -- refer to 1001_Pipeline_IngestRiskReg.sql for PipelineID
 DECLARE @RiskRegVersion VARCHAR(3)   	= '$(Version)';
 
