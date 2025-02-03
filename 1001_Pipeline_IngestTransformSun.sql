@@ -1,40 +1,40 @@
-﻿-- Add in Pipelines for Ingest Sun
+﻿-- Add in Pipelines for Ingest RiskReg
 
-DECLARE @SunIngestPipeline 	VARCHAR(100) 	= 'PL_Sun_SQL_To_Bronze'
-,		@SunCleansePipeline 	VARCHAR(100) 	= 'PL_Sun_Bronze_To_Silver'
-,		@SunCleanseParquetPipeline 	VARCHAR(100) 	= 'PL_Sun_Bronze_To_Silver_Parquet'
-,		@SunGoldPipeline 	VARCHAR(100)  	= 'PL_Sun_Silver_To_Gold'
-,		@SunIngestStageId	INT 			= 1
-,		@SunCleanseStageId	INT 			= 2
-,		@SunGoldStageId	INT 			= 3
-,		@SunActive          	INT             = $(SunActive)
-,		@SunActiveZZZZ          	INT         = $(SunActive)
-,		@SunParquetActive		INT			= $(SunParquetActive)
-,		@SunGoldPipelineFirstQueryFrom   VARCHAR(100)    = '2023-10-01 00:00:00' -- post release date to skip historical data;
+DECLARE @RiskRegIngestPipeline 	VARCHAR(100) 	= 'PL_xxxx_SQL_To_Bronze'
+,		@RiskRegCleansePipeline 	VARCHAR(100) 	= 'PL_RiskReg_Bronze_To_Silver'
+,		@RiskRegCleanseParquetPipeline 	VARCHAR(100) 	= 'PL_RiskReg_Bronze_To_Silver_Parquet'
+,		@RiskRegGoldPipeline 	VARCHAR(100)  	= 'PL_RiskReg_Silver_To_Gold'
+,		@RiskRegIngestStageId	INT 			= 1
+,		@RiskRegCleanseStageId	INT 			= 2
+,		@RiskRegGoldStageId	INT 			= 3
+,		@RiskRegActive          	INT             = $(RiskRegActive)
+,		@RiskRegActiveZZZZ          	INT         = $(RiskRegActive)
+,		@RiskRegParquetActive		INT			= $(RiskRegParquetActive)
+,		@RiskRegGoldPipelineFirstQueryFrom   VARCHAR(100)    = '2025-01-01 00:00:00' -- post release date to skip historical data;
 ;
 
 WITH Pipeline AS
 (
 -- Ingest
-SELECT	1 AS PipelineId, @SunIngestPipeline AS PipelineName, 'Sun Ingest XXX' AS PipelineDescription,2 AS SetId, @SunIngestStageId AS StageId, 1000 AS ExecutionOrder, 'I' AS ExecutionType, @SunActive  AS IsActive UNION
-SELECT	2 AS PipelineId, @SunIngestPipeline AS PipelineName, 'Sun Ingest VVVV' AS PipelineDescription,3 AS SetId, @SunIngestStageId AS StageId, 1020 AS ExecutionOrder, 'I' AS ExecutionType, @SunActive  AS IsActive UNION
-SELECT	3 AS PipelineId, @SunIngestPipeline AS PipelineName, 'Sun Ingest ZZZZ' AS PipelineDescription,4 AS SetId, @SunIngestStageId AS StageId, 1030 AS ExecutionOrder, 'I' AS ExecutionType, @SunActiveZZZZ  AS IsActive UNION
-SELECT	4 AS PipelineId, @SunIngestPipeline AS PipelineName, 'Sun Ingest ZZZZ' AS PipelineDescription,5 AS SetId, @SunIngestStageId AS StageId, 1040 AS ExecutionOrder, 'I' AS ExecutionType, @SunActive  AS IsActive UNION
-SELECT	5 AS PipelineId, @SunIngestPipeline AS PipelineName, 'Sun Ingest ZZZZ' AS PipelineDescription,6 AS SetId, @SunIngestStageId AS StageId, 1050 AS ExecutionOrder, 'I' AS ExecutionType, @SunActive  AS IsActive UNION
+SELECT	1 AS PipelineId, @RiskRegIngestPipeline AS PipelineName, 'RiskReg Ingest XXX' AS PipelineDescription,2 AS SetId, @RiskRegIngestStageId AS StageId, 1000 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActive  AS IsActive UNION
+SELECT	2 AS PipelineId, @RiskRegIngestPipeline AS PipelineName, 'RiskReg Ingest VVVV' AS PipelineDescription,3 AS SetId, @RiskRegIngestStageId AS StageId, 1020 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActive  AS IsActive UNION
+SELECT	3 AS PipelineId, @RiskRegIngestPipeline AS PipelineName, 'RiskReg Ingest ZZZZ' AS PipelineDescription,4 AS SetId, @RiskRegIngestStageId AS StageId, 1030 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActiveZZZZ  AS IsActive UNION
+SELECT	4 AS PipelineId, @RiskRegIngestPipeline AS PipelineName, 'RiskReg Ingest ZZZZ' AS PipelineDescription,5 AS SetId, @RiskRegIngestStageId AS StageId, 1040 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActive  AS IsActive UNION
+SELECT	5 AS PipelineId, @RiskRegIngestPipeline AS PipelineName, 'RiskReg Ingest ZZZZ' AS PipelineDescription,6 AS SetId, @RiskRegIngestStageId AS StageId, 1050 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActive  AS IsActive UNION
 
 -- Cleanse
-SELECT	6 AS PipelineId, @SunCleansePipeline AS PipelineName, 'Sun Cleanse CMC' AS PipelineDescription,2 AS SetId, @SunCleanseStageId AS StageId, 1010 AS ExecutionOrder, 'I' AS ExecutionType, @SunActive  AS IsActive UNION
-SELECT	7 AS PipelineId, @SunCleansePipeline AS PipelineName, 'Sun Cleanse VVVV' AS PipelineDescription,3 AS SetId, @SunCleanseStageId AS StageId, 1020 AS ExecutionOrder, 'I' AS ExecutionType, @SunActive  AS IsActive UNION
-SELECT	8 AS PipelineId, @SunCleansePipeline AS PipelineName, 'Sun Cleanse ZZZZ' AS PipelineDescription,4 AS SetId, @SunCleanseStageId AS StageId, 1030 AS ExecutionOrder, 'I' AS ExecutionType, @SunActiveZZZZ  AS IsActive UNION
-SELECT	9 AS PipelineId, @SunCleansePipeline AS PipelineName, 'Sun Cleanse ZZZZ' AS PipelineDescription,5 AS SetId, @SunCleanseStageId AS StageId, 1040 AS ExecutionOrder, 'I' AS ExecutionType, @SunActive  AS IsActive UNION
-SELECT	10 AS PipelineId, @SunCleansePipeline AS PipelineName, 'Sun Cleanse ZZZZ' AS PipelineDescription,6 AS SetId, @SunCleanseStageId AS StageId, 1050 AS ExecutionOrder, 'I' AS ExecutionType, @SunActive  AS IsActive UNION
+SELECT	6 AS PipelineId, @RiskRegCleansePipeline AS PipelineName, 'RiskReg Cleanse CMC' AS PipelineDescription,2 AS SetId, @RiskRegCleanseStageId AS StageId, 1010 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActive  AS IsActive UNION
+SELECT	7 AS PipelineId, @RiskRegCleansePipeline AS PipelineName, 'RiskReg Cleanse VVVV' AS PipelineDescription,3 AS SetId, @RiskRegCleanseStageId AS StageId, 1020 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActive  AS IsActive UNION
+SELECT	8 AS PipelineId, @RiskRegCleansePipeline AS PipelineName, 'RiskReg Cleanse ZZZZ' AS PipelineDescription,4 AS SetId, @RiskRegCleanseStageId AS StageId, 1030 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActiveZZZZ  AS IsActive UNION
+SELECT	9 AS PipelineId, @RiskRegCleansePipeline AS PipelineName, 'RiskReg Cleanse ZZZZ' AS PipelineDescription,5 AS SetId, @RiskRegCleanseStageId AS StageId, 1040 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActive  AS IsActive UNION
+SELECT	10 AS PipelineId, @RiskRegCleansePipeline AS PipelineName, 'RiskReg Cleanse ZZZZ' AS PipelineDescription,6 AS SetId, @RiskRegCleanseStageId AS StageId, 1050 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActive  AS IsActive UNION
 
 --Gold
-SELECT	11 AS PipelineId, @SunGoldPipeline AS PipelineName, 'Sun Gold CMC' AS PipelineDescription,2 AS SetId, @SunGoldStageId AS StageId, 10 AS ExecutionOrder, 'I' AS ExecutionType, @SunActive AS IsActive UNION
-SELECT	12 AS PipelineId, @SunGoldPipeline AS PipelineName, 'Sun Gold VVVV' AS PipelineDescription,3 AS SetId, @SunGoldStageId AS StageId, 20 AS ExecutionOrder, 'I' AS ExecutionType, @SunActive AS IsActive UNION
-SELECT	13 AS PipelineId, @SunGoldPipeline AS PipelineName, 'Sun Gold ZZZZ' AS PipelineDescription,4 AS SetId, @SunGoldStageId AS StageId, 30 AS ExecutionOrder, 'I' AS ExecutionType, @SunActiveZZZZ AS IsActive UNION
-SELECT	14 AS PipelineId, @SunGoldPipeline AS PipelineName, 'Sun Gold ZZZZ' AS PipelineDescription,5 AS SetId, @SunGoldStageId AS StageId, 40 AS ExecutionOrder, 'I' AS ExecutionType, @SunActive AS IsActive UNION
-SELECT	15 AS PipelineId, @SunGoldPipeline AS PipelineName, 'Sun Gold ZZZZ' AS PipelineDescription,6 AS SetId, @SunGoldStageId AS StageId, 50 AS ExecutionOrder, 'I' AS ExecutionType, @SunActive AS IsActive
+SELECT	11 AS PipelineId, @RiskRegGoldPipeline AS PipelineName, 'RiskReg Gold CMC' AS PipelineDescription,2 AS SetId, @RiskRegGoldStageId AS StageId, 10 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActive AS IsActive UNION
+SELECT	12 AS PipelineId, @RiskRegGoldPipeline AS PipelineName, 'RiskReg Gold VVVV' AS PipelineDescription,3 AS SetId, @RiskRegGoldStageId AS StageId, 20 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActive AS IsActive UNION
+SELECT	13 AS PipelineId, @RiskRegGoldPipeline AS PipelineName, 'RiskReg Gold ZZZZ' AS PipelineDescription,4 AS SetId, @RiskRegGoldStageId AS StageId, 30 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActiveZZZZ AS IsActive UNION
+SELECT	14 AS PipelineId, @RiskRegGoldPipeline AS PipelineName, 'RiskReg Gold ZZZZ' AS PipelineDescription,5 AS SetId, @RiskRegGoldStageId AS StageId, 40 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActive AS IsActive UNION
+SELECT	15 AS PipelineId, @RiskRegGoldPipeline AS PipelineName, 'RiskReg Gold ZZZZ' AS PipelineDescription,6 AS SetId, @RiskRegGoldStageId AS StageId, 50 AS ExecutionOrder, 'I' AS ExecutionType, @RiskRegActive AS IsActive
 )
 MERGE	config.Pipeline	tgt
 USING	Pipeline		src	ON	tgt.PipelineId		= src.PipelineId
