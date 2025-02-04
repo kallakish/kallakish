@@ -1,0 +1,13 @@
+Hi [Sender's Name],
+
+Thank you for following up.
+
+As mentioned earlier, the application is currently hosted on a Microsoft Virtual Machine Scale Set, and the OS image used is outdated. Microsoft no longer supports this OS version on VM Scale Sets, which could be contributing to the issue.
+
+We will escalate this with Microsoft to see if they can provide any assistance. However, if they are unable to support this version, we might need to consider upgrading the server OS to a version that is still supported by VM Scale Sets. If your team can raise a formal demand for this, we can explore the feasibility of an upgrade.
+
+That said, we have a challenge: the Test Factory application might not be compatible with a newer OS. Unfortunately, this application is no longer supported, and we are not sure which team, if any, could assist us in verifying its compatibility. Since the application dates back to 2019, gathering relevant information may be difficult.
+
+Additionally, our team has previously communicated that this application should no longer be used due to support and maintenance constraints. It was recommended that this application be decommissioned, as continuing to use it carries risks due to the lack of support.
+
+Please let us know how you'd like to proceed. We understand the urgency of the situation and will keep you updated as we hear back from Microsoft.
