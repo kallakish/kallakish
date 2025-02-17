@@ -1,0 +1,189 @@
+{
+	"name": "framework_Parent_Controller",
+	"properties": {
+		"description": "The Pipeline is not yet completed.",
+		"activities": [
+			{
+				"name": "Get Stages",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "00.00:05:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[config].[Get_Stages]",
+						"storedProcedureParameters": {
+							"CurrentExecutionId": {
+								"type": "Guid",
+								"value": {
+									"value": "@pipeline().parameters.P_CurrentExecutionId",
+									"type": "Expression"
+								}
+							},
+							"SetId": {
+								"value": {
+									"value": "@pipeline().parameters.P_SetId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_Metadata",
+						"type": "DatasetReference",
+						"parameters": {
+							"SchemaName": "config",
+							"TableName": "Application"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Execute Stages",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Stages",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Stages').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "framework_Child_Controller",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "framework_Child_Controller",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"P_StageId": {
+										"value": "@item().StageId",
+										"type": "Expression"
+									},
+									"P_SubscriptionId": {
+										"value": "@item().SubscriptionId",
+										"type": "Expression"
+									},
+									"P_TenantId": {
+										"value": "@item().TenantId",
+										"type": "Expression"
+									},
+									"P_CurrentExecutionId": {
+										"value": "@pipeline().parameters.P_CurrentExecutionId",
+										"type": "Expression"
+									},
+									"P_ResourceGroupName": {
+										"value": "@item().ResourceGroupName",
+										"type": "Expression"
+									},
+									"P_DataFactoryName": {
+										"value": "@item().DataFactoryName",
+										"type": "Expression"
+									},
+									"P_GlobalExecutionType": {
+										"value": "@pipeline().parameters.P_GlobalExecutionType",
+										"type": "Expression"
+									},
+									"P_SourceNameOverride": {
+										"value": "@pipeline().parameters.P_SourceNameOverride",
+										"type": "Expression"
+									},
+									"P_StartDate": {
+										"value": "@pipeline().parameters.P_StartDate",
+										"type": "Expression"
+									},
+									"P_EndDate": {
+										"value": "@pipeline().parameters.P_EndDate",
+										"type": "Expression"
+									},
+									"P_SetId": {
+										"value": "@item().SetId",
+										"type": "Expression"
+									},
+									"P_OverrideParams": {
+										"value": "@pipeline().parameters.P_OverrideParams",
+										"type": "Expression"
+									},
+									"P_Version": {
+										"value": "@pipeline().parameters.P_Version",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"P_ApplicationId": {
+				"type": "int",
+				"defaultValue": 1
+			},
+			"P_SetId": {
+				"type": "int",
+				"defaultValue": -1
+			},
+			"P_PipelineId": {
+				"type": "int",
+				"defaultValue": -1
+			},
+			"P_GlobalExecutionType": {
+				"type": "string",
+				"defaultValue": "I"
+			},
+			"P_SourceNameOverride": {
+				"type": "string"
+			},
+			"P_StartDate": {
+				"type": "string"
+			},
+			"P_EndDate": {
+				"type": "string"
+			},
+			"P_StageId": {
+				"type": "string",
+				"defaultValue": "-1"
+			},
+			"P_CurrentExecutionId": {
+				"type": "string",
+				"defaultValue": "-1"
+			},
+			"P_OverrideParams": {
+				"type": "object"
+			},
+			"P_Version": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "Framework"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-06-29T22:13:56Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

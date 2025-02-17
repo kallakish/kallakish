@@ -1,0 +1,637 @@
+{
+	"name": "framework_Child_Controller_Switch1",
+	"properties": {
+		"activities": [
+			{
+				"name": "Determine Pipeline",
+				"type": "Switch",
+				"dependsOn": [],
+				"userProperties": [
+					{
+						"name": "PipelineName",
+						"value": "@item().PipelineName"
+					},
+					{
+						"name": "PipelineParameters",
+						"value": "@pipeline().parameters.P_Pipeline_Params"
+					}
+				],
+				"typeProperties": {
+					"on": {
+						"value": "@pipeline().parameters.P_PipelineName",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "PL_Main_Ingest_CCD_Data_Store",
+							"activities": [
+								{
+									"name": "PL_Main_Ingest_CCD_Data_Store",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Main_Ingest_CCD_Data_Store",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											},
+											"P_CurrentExecutionId": {
+												"value": "@pipeline().parameters.P_CurrentExecutionId",
+												"type": "Expression"
+											},
+											"P_StageId": {
+												"value": "@pipeline().parameters.P_StageId",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Optic_Ingestion_Persistence_And_Export",
+							"activities": [
+								{
+									"name": "PL_Optic_Ingestion_Persistence_And_Export",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Optic_Ingestion_Persistence_And_Export",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											},
+											"P_CurrentExecutionId": {
+												"value": "@pipeline().parameters.P_CurrentExecutionId",
+												"type": "Expression"
+											},
+											"P_StageId": {
+												"value": "@pipeline().parameters.P_StageId",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Generic_Excel_To_Landing",
+							"activities": [
+								{
+									"name": "PL_Generic_Excel_To_Landing",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Generic_Excel_To_Landing",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Generic_Oracle_To_Landing",
+							"activities": [
+								{
+									"name": "PL_Generic_OracleDB_To_Landing",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Generic_OracleDB_To_Landing",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Generic_Landing_To_Persistent_Parquet",
+							"activities": [
+								{
+									"name": "PL_Generic_Landing_To_Persistent_Parquet",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Generic_Landing_To_Persistent_Parquet",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Generic_Postgres_To_Landing_Parquet",
+							"activities": [
+								{
+									"name": "PL_Generic_Postgres_To_Landing_Parquet",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Generic_Postgres_To_Landing_Parquet",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Generic_SQLServer_To_Landing_Parquet",
+							"activities": [
+								{
+									"name": "PL_Generic_SQLServer_To_Landing_Parquet",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Generic_SQLServer_To_Landing_Parquet",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Generic_Landing_Json_To_Persisted_Parquet",
+							"activities": [
+								{
+									"name": "PL_Generic_Landing_Json_To_Persisted_Parquet",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Generic_Landing_Json_To_Persisted_Parquet",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Generic_Landing_To_Persistent_Parquet_Full",
+							"activities": [
+								{
+									"name": "PL_Generic_Landing_To_Persistent_Parquet_Full",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Generic_Landing_To_Persistent_Parquet_Full",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Ingest_Google_Analytics_To_Landing",
+							"activities": [
+								{
+									"name": "PL_Ingest_Google_Analytics_To_Landing",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Ingest_Google_Analytics_To_Landing",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Generic_Oracle_To_Landing_With_Pagination",
+							"activities": [
+								{
+									"name": "PL_Generic_OracleDB_To_Landing_With_Pagination",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Generic_OracleDB_To_Landing_With_Pagination",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Migrate_Persist_To_Persist_Parquet",
+							"activities": [
+								{
+									"name": "PL_Migrate_Persist_To_Persist_Parquet",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Migrate_Persist_To_Persist_Parquet",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Notify_Landing_To_Persistent_Parquet",
+							"activities": [
+								{
+									"name": "PL_Notify_Landing_To_Persistent_Parquet",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Notify_Landing_To_Persistent_Parquet",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Generic_landingJson_To_PersistParquet_DBTable",
+							"activities": [
+								{
+									"name": "PL_Generic_Landing_To_Persisted_DBTable_v3",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Generic_landingJson_To_PersistParquet_DBTable",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Generic_landingJson_To_PersistParquet_With_Date_Format",
+							"activities": [
+								{
+									"name": "PL_Generic_landingJson_To_Parquet_With_Date_Parquet",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Generic_landingJson_To_PersistParquet_With_Date_Format",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Copy_Landing_Parquet_To_Persist_By_Prefix",
+							"activities": [
+								{
+									"name": "PL_Copy_Landing_Parquet_To_Persist_By_Prefix",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Copy_Landing_Parquet_To_Persist_By_Prefix",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_SL_ingestjson_to_persistparquet",
+							"activities": [
+								{
+									"name": "PL_SL_ingestjson_to_persistparquet",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_SL_ingestjson_to_persistparquet",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Common_Platform_LandingJson_To_PersistParquet",
+							"activities": [
+								{
+									"name": "PL_Common_Platform_LandingJson_To_PersistParquet",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Common_Platform_LandingJson_To_PersistParquet",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Generic_SFTP_CSV_To_Landing",
+							"activities": [
+								{
+									"name": "PL_Generic_SFTP_CSV_To_Landing",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Generic_SFTP_CSV_To_Landing",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Generic_SQLServer_To_Landing_Parquet_Raw",
+							"activities": [
+								{
+									"name": "PL_Generic_SQLServer_To_Landing_Parquet_Raw",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Generic_SQLServer_To_Landing_Parquet_Raw",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Adhoc_Ingestion",
+							"activities": [
+								{
+									"name": "PL_Adhoc_Ingestion",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Adhoc_Ingestion",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "PL_Main_CEFiles_Landing_To_Persist",
+							"activities": [
+								{
+									"name": "PL_Main_CEFiles_Landing_To_Persist",
+						
+															"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_Main_CEFiles_Landing_To_Persist",						
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"P_PipelineParameters": {
+												"value": "@pipeline().parameters.P_Pipeline_Params",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					],
+					"defaultActivities": [
+						{
+							"name": "Pipeline Not Found",
+							"type": "Fail",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"message": {
+									"value": "@concat(pipeline().parameters.P_PipelineId,'with pipeline name ',pipeline().parameters.P_PipelineName, 'does not exist')",
+									"type": "Expression"
+								},
+								"errorCode": "pipelinenotexist"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"P_Pipeline_Params": {
+				"type": "string"
+			},
+			"P_PipelineName": {
+				"type": "string"
+			},
+			"P_PipelineId": {
+				"type": "string"
+			},
+			"P_StageId": {
+				"type": "string"
+			},
+			"P_CurrentExecutionId": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"V_webURLbase": {
+				"type": "String",
+				"defaultValue": "https://management.azure.com/subscriptions/"
+			},
+			"V_webURLfinal": {
+				"type": "String"
+			},
+			"V_PipelineParams": {
+				"type": "String"
+			},
+			"V_ErrorMessage": {
+				"type": "String"
+			},
+			"V_PipelineName": {
+				"type": "String"
+			},
+			"V_Pipeline_List1_Not_Found": {
+				"type": "String"
+			},
+			"V_Pipeline_List2_Not_Found": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Framework"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-06-30T12:17:45Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

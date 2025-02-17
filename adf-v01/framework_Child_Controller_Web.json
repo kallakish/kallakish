@@ -1,0 +1,384 @@
+{
+	"name": "framework_Child_Controller_Web",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Pipelines",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:15:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "config.[Get_PipelinesInStage]",
+						"storedProcedureParameters": {
+							"CurrentExecutionId": {
+								"type": "Guid",
+								"value": {
+									"value": "@pipeline().parameters.CurrentExecutionId",
+									"type": "Expression"
+								}
+							},
+							"StageId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.StageId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_Metadata",
+						"type": "DatasetReference",
+						"parameters": {
+							"SchemaName": "config",
+							"TableName": "Application"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Execute Pipelines",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Pipelines",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Pipelines').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Log Pipeline Running",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:15:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[Set_LogPipelineRunning]",
+								"storedProcedureParameters": {
+									"CurrentExecutionId": {
+										"value": {
+											"value": "@pipeline().parameters.CurrentExecutionId",
+											"type": "Expression"
+										},
+										"type": "Guid"
+									},
+									"StageId": {
+										"value": {
+											"value": "@pipeline().parameters.StageId",
+											"type": "Expression"
+										},
+										"type": "Int16"
+									},
+									"PipelineId": {
+										"value": {
+											"value": "@item().PipelineId",
+											"type": "Expression"
+										},
+										"type": "Int16"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_Metadata_SQL",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Get Pipeline Params",
+							"type": "Lookup",
+							"dependsOn": [
+								{
+									"activity": "Log Pipeline Running",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.00:15:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[config].[Get_PipelineParameters]",
+									"storedProcedureParameters": {
+										"PipelineId": {
+											"type": "Int16",
+											"value": {
+												"value": "@item().PipelineId",
+												"type": "Expression"
+											}
+										},
+										"CurrentExecutionId": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().parameters.CurrentExecutionId",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "DS_Metadata",
+									"type": "DatasetReference",
+									"parameters": {
+										"SchemaName": "config",
+										"TableName": "Application"
+									}
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "Log Pipeline Success",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Execute Pipeline",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.00:15:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[Set_LogPipelineSuccess]",
+								"storedProcedureParameters": {
+									"CurrentExecutionId": {
+										"value": {
+											"value": "@pipeline().parameters.CurrentExecutionId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"StageId": {
+										"value": {
+											"value": "@pipeline().parameters.StageId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"PipelineId": {
+										"value": {
+											"value": "@item().PipelineId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_Metadata_SQL",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Log Pipeline Failure",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Execute Pipeline",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.00:15:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[Set_LogPipelineFailed]",
+								"storedProcedureParameters": {
+									"CurrentExecutionId": {
+										"value": {
+											"value": "@pipeline().parameters.CurrentExecutionId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"StageId": {
+										"value": {
+											"value": "@pipeline().parameters.StageId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"PipelineId": {
+										"value": {
+											"value": "@item().PipelineId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": {
+											"value": "@activity('Execute Pipeline').Error.Message",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_Metadata_SQL",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Web URL",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Get Pipeline Params",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "webURLfinal",
+								"value": {
+									"value": "@concat(\nvariables('webURLbase'), \nstring(pipeline().parameters.SubscriptionId), \n'/resourceGroups/', \npipeline().parameters.ResourceGroupName, \n'/providers/Microsoft.DataFactory/factories/', \npipeline().parameters.DataFactoryName, \n'/pipelines/', \nitem().PipelineName, \n'/createRun?api-version=2018-06-01'\n)",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Execute Pipeline",
+							"type": "WebActivity",
+							"dependsOn": [
+								{
+									"activity": "Web URL",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.00:05:00",
+								"retry": 4,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "@variables('webURLfinal')",
+									"type": "Expression"
+								},
+								"connectVia": {
+									"referenceName": "IR-Self-hosted",
+									"type": "IntegrationRuntimeReference"
+								},
+								"method": "POST",
+								"headers": {
+									"Content-Type": "application/json"
+								},
+								"body": {
+									"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://management.core.windows.net/"
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"StageId": {
+				"type": "int"
+			},
+			"SubscriptionId": {
+				"type": "string"
+			},
+			"TenantId": {
+				"type": "string"
+			},
+			"CurrentExecutionId": {
+				"type": "string"
+			},
+			"ResourceGroupName": {
+				"type": "string"
+			},
+			"DataFactoryName": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"webURLbase": {
+				"type": "String",
+				"defaultValue": "https://management.azure.com/subscriptions/"
+			},
+			"webURLfinal": {
+				"type": "String"
+			},
+			"PipelineParams": {
+				"type": "String"
+			},
+			"ErrorMessage": {
+				"type": "String"
+			},
+			"PipelineName": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Framework"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-06-30T12:17:45Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

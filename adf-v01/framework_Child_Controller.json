@@ -1,0 +1,1122 @@
+{
+	"name": "framework_Child_Controller",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Pipelines",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "00.00:05:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "config.[Get_PipelinesInStage]",
+						"storedProcedureParameters": {
+							"CurrentExecutionId": {
+								"type": "Guid",
+								"value": {
+									"value": "@pipeline().parameters.P_CurrentExecutionId",
+									"type": "Expression"
+								}
+							},
+							"StageId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.P_StageId",
+									"type": "Expression"
+								}
+							},
+							"SetId": {
+								"value": {
+									"value": "@pipeline().parameters.P_SetId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_Metadata",
+						"type": "DatasetReference",
+						"parameters": {
+							"SchemaName": "config",
+							"TableName": "Application"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Execute Pipelines",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Pipelines",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Pipelines').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"batchCount": 20,
+					"activities": [
+						{
+							"name": "Log Pipeline Running",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "00.00:05:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[Set_LogPipelineRunning]",
+								"storedProcedureParameters": {
+									"CurrentExecutionId": {
+										"value": {
+											"value": "@pipeline().parameters.P_CurrentExecutionId",
+											"type": "Expression"
+										},
+										"type": "Guid"
+									},
+									"StageId": {
+										"value": {
+											"value": "@pipeline().parameters.P_StageId",
+											"type": "Expression"
+										},
+										"type": "Int16"
+									},
+									"PipelineId": {
+										"value": {
+											"value": "@item().PipelineId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_Metadata_SQL",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Get Pipeline Params",
+							"type": "Lookup",
+							"dependsOn": [
+								{
+									"activity": "Log Pipeline Running",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "00.00:05:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[config].[Get_PipelineParameters]",
+									"storedProcedureParameters": {
+										"EndDate": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().parameters.P_EndDate",
+												"type": "Expression"
+											}
+										},
+										"ExtraParams": {
+											"type": "String",
+											"value": {
+												"value": "@string(pipeline().parameters.P_OverrideParams)",
+												"type": "Expression"
+											}
+										},
+										"GlobalExecutionType": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().parameters.P_GlobalExecutionType",
+												"type": "Expression"
+											}
+										},
+										"PipelineId": {
+											"type": "Int32",
+											"value": {
+												"value": "@item().PipelineId",
+												"type": "Expression"
+											}
+										},
+										"SourceNameOverride": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().parameters.P_SourceNameOverride",
+												"type": "Expression"
+											}
+										},
+										"StartDate": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().parameters.P_StartDate",
+												"type": "Expression"
+											}
+										},
+										"Version": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().parameters.P_Version",
+												"type": "Expression"
+											}
+										},
+										"CurrentExecutionId": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().parameters.P_CurrentExecutionId",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "DS_Metadata",
+									"type": "DatasetReference",
+									"parameters": {
+										"SchemaName": "config",
+										"TableName": "Application"
+									}
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "Determine Pipeline",
+							"type": "Switch",
+							"dependsOn": [
+								{
+									"activity": "Get Pipeline Params",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [
+								{
+									"name": "PipelineName",
+									"value": "@item().PipelineName"
+								},
+								{
+									"name": "PipelineParameters",
+									"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters"
+								}
+							],
+							"typeProperties": {
+								"on": {
+									"value": "@item().PipelineName",
+									"type": "Expression"
+								},
+								"cases": [
+									{
+										"value": "PL_Notify_API_To_Landing",
+										"activities": [
+											{
+												"name": "PL_Notify_API_To_Landing",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Notify_API_To_Landing",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Notify_Landing_To_Persistent",
+										"activities": [
+											{
+												"name": "PL_Notify_Landing_To_Persistent",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Notify_Landing_To_Persistent",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Notify_Persistent_To_Persistent_Historical",
+										"activities": [
+											{
+												"name": "PL_Notify_Persistent_To_Persistent_Historical",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Notify_Persistent_To_Persistent_Historical",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Avaya_Analytics_To_Landing",
+										"activities": [
+											{
+												"name": "PL_Avaya_Analytics_To_Landing",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Avaya_Analytics_To_Landing",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Generic_Landing_To_Persisted_DBTable",
+										"activities": [
+											{
+												"name": "PL_Generic_Landing_To_Persisted_DBTable",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Generic_Landing_To_Persisted_DBTable",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Generic_SQLServer_To_Landing",
+										"activities": [
+											{
+												"name": "PL_Generic_SQLServer_To_Landing",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Generic_SQLServer_To_Landing",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Export_Persistent_To_Export",
+										"activities": [
+											{
+												"name": "PL_Export_Persistent_To_Export",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Export_Persistent_To_Export",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Payment_Payment_To_Landing",
+										"activities": [
+											{
+												"name": "Payment",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Ingest_Payment",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Generic_Azure_CSV_Storage",
+										"activities": [
+											{
+												"name": "PL_Generic_Azure_CSV_Storage",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Generic_Azure_CSV_Storage",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_SL_ingest_to_persist",
+										"activities": [
+											{
+												"name": "PL_SL_ingest_to_persist",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_SL_ingest_to_persist",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_SmartSurvey_Surveys_API_To_Landing",
+										"activities": [
+											{
+												"name": "PL_SmartSurvey_Surveys_API_To_Landing",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_SmartSurvey_Surveys_API_To_Landing",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_SmartSurvey_Responses_API_To_Landing",
+										"activities": [
+											{
+												"name": "PL_SmartSurvey_Response_API_To_Landing",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_SmartSurvey_Response_API_To_Landing",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Avaya_Analitycs_Wrapper",
+										"activities": [
+											{
+												"name": "PL_Avaya_Analitycs_Wrapper",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Avaya_Analitycs_Wrapper",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Avaya_Generic_Wrapper",
+										"activities": [
+											{
+												"name": "PL_Avaya_Generic_Wrapper",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Avaya_Generic_Wrapper",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Ingest_Qualtrics_Survey_Details",
+										"activities": [
+											{
+												"name": "Execute PL_Ingest_Qualtrics_Survey_Details",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Ingest_Qualtrics_Survey_Details",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Generic_Postgress_To_Landing",
+										"activities": [
+											{
+												"name": "PL_Generic_Postgress_To_Landing",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Generic_Postgress_To_Landing",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_ExE_Source_To_Landing",
+										"activities": [
+											{
+												"name": "PL_ExE_Source_To_Landing",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_ExE_Source_To_Landing",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Main_Common_Platform_SFTP_To_Landing",
+										"activities": [
+											{
+												"name": "PL_Main_Common_Platform_SFTP_To_Landing",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Main_Common_Platform_SFTP_To_Landing",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Common_Platform_Landing_To_Persist",
+										"activities": [
+											{
+												"name": "PL_Common_Platform_Landing_To_Persist",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Common_Platform_Landing_To_Persist",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Convert_Mdb_To_Json",
+										"activities": [
+											{
+												"name": "PL_Convert_Mdb_To_Json",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Convert_Mdb_To_Json",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Generic_Landing_To_Persistent_All_Source_Containers",
+										"activities": [
+											{
+												"name": "PL_Generic_Landing_To_Persistent_All_Source_Containers",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Generic_Landing_To_Persistent_All_Source_Containers",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_ExE_Generic_Wrapper",
+										"activities": [
+											{
+												"name": "PL_ExE_Generic_Wrapper",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_ExE_Generic_Wrapper",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Ingest_Rest_With_Form_Token_Auth",
+										"activities": [
+											{
+												"name": "PL_Ingest_Rest_With_Form_Token_Auth",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Ingest_Rest_With_Form_Token_Auth",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Generic_Landing_To_Persistent_With_Date_Format",
+										"activities": [
+											{
+												"name": "PL_Generic_Landing_To_Persistent_With_Date_Format",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Generic_Landing_To_Persistent_With_Date_Format",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "PL_Ingest_Rest_With_Static_Token_Auth",
+										"activities": [
+											{
+												"name": "PL_Ingest_Rest_With_Static_Token_Auth",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Ingest_Rest_With_Static_Token_Auth",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_PipelineParameters": {
+															"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									}
+								],
+								"defaultActivities": [
+									{
+										"name": "framework_Child_Controller_Switch1",
+										"type": "ExecutePipeline",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"pipeline": {
+												"referenceName": "framework_Child_Controller_Switch1",
+												"type": "PipelineReference"
+											},
+											"waitOnCompletion": true,
+											"parameters": {
+												"P_Pipeline_Params": {
+													"value": "@activity('Get Pipeline Params').output.firstRow.PipelineParameters",
+													"type": "Expression"
+												},
+												"P_PipelineName": {
+													"value": "@item().PipelineName",
+													"type": "Expression"
+												},
+												"P_PipelineId": {
+													"value": "@item().PipelineId",
+													"type": "Expression"
+												},
+												"P_StageId": {
+													"value": "@pipeline().parameters.P_StageId",
+													"type": "Expression"
+												},
+												"P_CurrentExecutionId": {
+													"value": "@pipeline().parameters.P_CurrentExecutionId",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "Log Pipeline Switch Failure",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Determine Pipeline",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "00.00:05:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[Set_LogPipelineFailed]",
+								"storedProcedureParameters": {
+									"CurrentExecutionId": {
+										"value": {
+											"value": "@pipeline().parameters.P_CurrentExecutionId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"StageId": {
+										"value": {
+											"value": "@pipeline().parameters.P_StageId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"PipelineId": {
+										"value": {
+											"value": "@item().PipelineId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ADFRunId": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorMessage": {
+										"value": {
+											"value": "@activity('Determine Pipeline').Error.Message",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_Metadata_SQL",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Log Pipeline Success",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Determine Pipeline",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "00.00:05:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[Set_LogPipelineSuccess]",
+								"storedProcedureParameters": {
+									"CurrentExecutionId": {
+										"value": {
+											"value": "@pipeline().parameters.P_CurrentExecutionId",
+											"type": "Expression"
+										},
+										"type": "Guid"
+									},
+									"PipelineId": {
+										"value": {
+											"value": "@item().PipelineId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"StageId": {
+										"value": {
+											"value": "@pipeline().parameters.P_StageId",
+											"type": "Expression"
+										},
+										"type": "Int16"
+									},
+									"ADFRunId": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_Metadata_SQL",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Log Trigger Success",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Determine Pipeline",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "00.00:05:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[config].[Create_Or_Update_Trigger_LastSuccessfulExecution]",
+								"storedProcedureParameters": {
+									"LastSuccessfullExecution": {
+										"value": {
+											"value": "@pipeline().TriggerTime",
+											"type": "Expression"
+										},
+										"type": "DateTime"
+									},
+									"PipelineId": {
+										"value": {
+											"value": "@item().PipelineId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_Metadata_SQL",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"P_StageId": {
+				"type": "int"
+			},
+			"P_SubscriptionId": {
+				"type": "string"
+			},
+			"P_TenantId": {
+				"type": "string"
+			},
+			"P_CurrentExecutionId": {
+				"type": "string"
+			},
+			"P_ResourceGroupName": {
+				"type": "string"
+			},
+			"P_DataFactoryName": {
+				"type": "string"
+			},
+			"P_GlobalExecutionType": {
+				"type": "string"
+			},
+			"P_SourceNameOverride": {
+				"type": "string"
+			},
+			"P_StartDate": {
+				"type": "string"
+			},
+			"P_EndDate": {
+				"type": "string"
+			},
+			"P_SetId": {
+				"type": "string"
+			},
+			"P_OverrideParams": {
+				"type": "object"
+			},
+			"P_Version": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"V_webURLbase": {
+				"type": "String",
+				"defaultValue": "https://management.azure.com/subscriptions/"
+			},
+			"V_webURLfinal": {
+				"type": "String"
+			},
+			"V_PipelineParams": {
+				"type": "String"
+			},
+			"V_ErrorMessage": {
+				"type": "String"
+			},
+			"V_PipelineName": {
+				"type": "String"
+			},
+			"V_Pipeline_List1_Not_Found": {
+				"type": "String"
+			},
+			"V_Pipeline_List2_Not_Found": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Framework"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-06-30T12:17:45Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
