@@ -1,5 +1,4 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
 import re
 from notebookutils import mssparkutils  # Fabric's alternative to dbutils
 
@@ -43,19 +42,17 @@ def get_latest_file(path):
     print(f"Latest file found: {latest_file}")
     return latest_file
 
-# Dictionary to hold DataFrames
-dataframes = {}
-
 # Load latest files for each source table
 for table in source_tables:
     latest_file = get_latest_file(f"{bronze_path}/{table}")
     print(f"Using latest file for {table}: {latest_file}")
     
-    # Load data into DataFrame
-    df = spark.read.format("delta").load(latest_file)
-    df.createOrReplaceTempView(table)  # Creating a temp view with table name
-    print(f"Temporary view created for {table}")
-    dataframes[table] = df
+    # Load data into SQL temp table using Spark SQL
+    spark.sql(f"""
+        CREATE OR REPLACE TEMP VIEW {table} AS 
+        SELECT * FROM delta.`{latest_file}`
+    """)
+    print(f"Temporary SQL view created for {table}")
 
 # Read the transformation queries from a .txt or .sql file
 print(f"Reading transformation queries from: {query_file_path}")
@@ -71,15 +68,23 @@ for sql_query in sql_queries:
     if sql_query.strip():  # Ensure it's not an empty query
         print(f"Executing query: {sql_query}")
         
-        # Execute transformation query using the temp views
-        silver_df = spark.sql(sql_query)
+        # Execute transformation query using Spark SQL
+        transformed_table = f"{target_table}_temp"
+        spark.sql(f"""
+            CREATE OR REPLACE TEMP VIEW {transformed_table} AS 
+            {sql_query}
+        """)
         
-        # Print schema and few rows for debugging
-        silver_df.printSchema()
-        silver_df.show(5)
+        # Debug: Show schema and sample rows
+        spark.sql(f"DESCRIBE {transformed_table}").show()
+        spark.sql(f"SELECT * FROM {transformed_table} LIMIT 5").show()
         
         # Write transformed data to Silver layer
-        silver_df.write.format("delta").mode("overwrite").save(f"{silver_path}/{target_table}")
+        spark.sql(f"""
+            CREATE OR REPLACE TABLE {target_table} 
+            USING DELTA 
+            AS SELECT * FROM {transformed_table}
+        """)
         print(f"Table {target_table} processed and saved to Silver layer at {silver_path}/{target_table}")
 
 print("Bronze to Silver transformation completed!")
