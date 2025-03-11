@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
-import dbutils
 import re
+from notebookutils import mssparkutils  # Fabric's alternative to dbutils
 
 # Initialize Spark Session
 spark = SparkSession.builder.appName("BronzeToSilverETL").getOrCreate()
@@ -18,7 +18,8 @@ target_table = "final_silver_table"  # Target table name
 def get_latest_file(path):
     """Gets the latest file based on the timestamp in the filename."""
     print(f"Fetching latest file from path: {path}")
-    files = dbutils.fs.ls(path)
+    
+    files = mssparkutils.fs.ls(path)  # Use Fabric's mssparkutils instead of dbutils
     
     if not files:
         raise FileNotFoundError(f"No files found in {path}")
