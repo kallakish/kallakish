@@ -1,0 +1,96 @@
+1. Test Spark Session Connection:
+The first step is to make sure the Spark session is correctly initialized.
+
+python
+Copy
+Edit
+from pyspark.sql import SparkSession
+
+# Initialize Spark Session
+try:
+    spark = SparkSession.builder.appName("BronzeToSilverETL").getOrCreate()
+    print("Spark session initialized successfully.")
+except Exception as e:
+    print(f"Failed to initialize Spark session: {e}")
+If Spark initializes successfully, you'll see "Spark session initialized successfully." printed.
+
+2. Test Azure Storage Account Connection:
+You can test the connection to Azure Blob Storage or Data Lake (ABFS) by checking if you can list the files in a directory.
+
+python
+Copy
+Edit
+from notebookutils import mssparkutils  # Fabric's alternative to dbutils
+
+storage_account = "my_storage_account"
+lakehouse_path = "abfss://lakehouse@my_storage_account.dfs.core.windows.net"
+
+# Test the connection by listing files from a specific path
+try:
+    files = mssparkutils.fs.ls(lakehouse_path)
+    if files:
+        print(f"Successfully connected to {lakehouse_path}. Files in the directory:")
+        for file in files:
+            print(file.name)
+    else:
+        print(f"No files found at {lakehouse_path}")
+except Exception as e:
+    print(f"Failed to connect to {lakehouse_path}: {e}")
+This tests if your storage account and filesystem are correctly connected. If successful, you will see a list of files or a success message.
+
+3. Test File Access:
+You can also test whether the specific paths (e.g., for your bronze_path or silver_path) are accessible.
+
+python
+Copy
+Edit
+bronze_path = "Files/bronze/Metadata_Framework"
+
+# Test access to bronze path
+try:
+    files = mssparkutils.fs.ls(bronze_path)
+    if files:
+        print(f"Successfully accessed bronze path: {bronze_path}")
+    else:
+        print(f"No files found at {bronze_path}")
+except Exception as e:
+    print(f"Failed to access bronze path {bronze_path}: {e}")
+4. Test Database Connection (if applicable):
+If you're connecting to a database (e.g., SQL Server, PostgreSQL, or other), you would test the connection like this:
+
+python
+Copy
+Edit
+# Example for testing a database connection (replace with actual connection logic)
+from pyspark.sql import DataFrame
+
+# Replace with your database connection string and properties
+jdbc_url = "jdbc:sqlserver://your-database-url:1433;databaseName=your-database"
+properties = {
+    "user": "your-username",
+    "password": "your-password",
+    "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+}
+
+try:
+    # Try to load a small sample from the database
+    sample_data = spark.read.jdbc(url=jdbc_url, table="your_table", properties=properties)
+    sample_data.show(5)  # Display a few rows to test the connection
+    print("Database connection successful.")
+except Exception as e:
+    print(f"Failed to connect to the database: {e}")
+5. Test File Read (Parquet/Delta):
+You can test reading a file to ensure that the file format is correct and accessible.
+
+python
+Copy
+Edit
+test_file_path = "abfss://lakehouse@my_storage_account.dfs.core.windows.net/Files/bronze/Metadata_Framework/tbi_Stage_01-01-2025:12:00:00.parquet"
+
+# Test reading a sample parquet file (or a small sample of data)
+try:
+    df = spark.read.parquet(test_file_path)
+    df.show(5)
+    print(f"Successfully read data from {test_file_path}")
+except Exception as e:
+    print(f"Failed to read data from {test_file_path}: {e}")
