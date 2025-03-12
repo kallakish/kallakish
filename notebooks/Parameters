@@ -1,0 +1,21 @@
+from notebookutils import mssparkutils
+
+# Define widgets for notebook parameters
+mssparkutils.widgets.text("lakehouse_path", "abfss://lakehouse@my_storage_account.dfs.core.windows.net", "Lakehouse Path")
+mssparkutils.widgets.text("bronze_path", "Files/bronze/Metadata_Framework", "Bronze Path")
+mssparkutils.widgets.text("silver_path", "Files/silver", "Silver Path")
+mssparkutils.widgets.text("target_table", "final_silver_table", "Target Table")
+mssparkutils.widgets.text("source_tables", "tbi_Stage", "Source Tables (comma separated)")
+
+# Retrieve widget values
+lakehouse_path = mssparkutils.widgets.get("lakehouse_path")
+bronze_path = mssparkutils.widgets.get("bronze_path")
+silver_path = mssparkutils.widgets.get("silver_path")
+target_table = mssparkutils.widgets.get("target_table")
+source_tables = mssparkutils.widgets.get("source_tables").split(",")
+
+print(f"Lakehouse Path: {lakehouse_path}")
+print(f"Bronze Path: {bronze_path}")
+print(f"Silver Path: {silver_path}")
+print(f"Target Table: {target_table}")
+print(f"Source Tables: {source_tables}")
