@@ -1,0 +1,250 @@
+{
+	"name": "PL_Generic_SFTP_CSV_To_Landing_Copy_Data",
+	"properties": {
+		"description": "Extract csv data from an sftp server to landing storage in parquet format",
+		"activities": [
+			{
+				"name": "Copy SFTP CSV To Landing Parquet",
+				"description": "Copy CSV files from the SFTP server to landing parquet",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set blobName",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "SftpReadSettings",
+							"recursive": true,
+							"wildcardFolderPath": {
+								"value": "@pipeline().parameters.P_folder",
+								"type": "Expression"
+							},
+							"wildcardFileName": {
+								"value": "@pipeline().parameters.P_fileName",
+								"type": "Expression"
+							},
+							"enablePartitionDiscovery": false,
+							"disableChunking": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "ParquetSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings",
+							"copyBehavior": "MergeFiles"
+						},
+						"formatSettings": {
+							"type": "ParquetWriteSettings"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Generic_SFTP_CSV",
+						"type": "DatasetReference",
+						"parameters": {
+							"hostName": {
+								"value": "@pipeline().parameters.P_hostName",
+								"type": "Expression"
+							},
+							"userName": {
+								"value": "@pipeline().parameters.P_userName",
+								"type": "Expression"
+							},
+							"passwordKey": {
+								"value": "@pipeline().parameters.P_passwordKey",
+								"type": "Expression"
+							},
+							"port": {
+								"value": "@pipeline().parameters.P_port",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Generic_Parquet_Landing_File",
+						"type": "DatasetReference",
+						"parameters": {
+							"containerName": {
+								"value": "@variables('V_ContainerName')",
+								"type": "Expression"
+							},
+							"fileName": {
+								"value": "@variables('V_blobName')",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Set Container Name",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set fileDateDetails",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "V_ContainerName",
+					"value": {
+						"value": "@concat(\n    pipeline().parameters.P_Version,\n    '-',\n    pipeline().parameters.P_sourceName,\n    '-',\n    replace(\n        replace(\n            replace(\n                trim(\n                    split(\n                        replace(\n                            toLower(pipeline().parameters.P_fileName),\n                            '  ',\n                            ' '\n                        ),\n                        '- 2'\n                   )[0]\n                ),\n                '-',\n                ''\n            ),\n            ' ',\n            '-'\n        ),\n        '--',\n        '-'\n    )\n)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set fileDateDetails",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set blobFolder",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "V_fileDateDetails",
+					"value": {
+						"value": "@concat(\n    variables('V_extractedFileDateDetails')[0],\n    '-',\n    if(\n        equals(\n            length(variables('V_extractedFileDateDetails')[1]),\n            1\n        ),\n        '0',\n        ''\n    ),\n    variables('V_extractedFileDateDetails')[1],\n    '-',\n    if(\n        equals(\n            length(variables('V_extractedFileDateDetails')[2]),\n            1\n        ),\n        '0',\n        ''\n    ),\n    variables('V_extractedFileDateDetails')[2],\n    '-',\n    variables('V_extractedFileDateDetails')[3],\n    '-',\n    variables('V_extractedFileDateDetails')[4],\n    '-',\n    variables('V_extractedFileDateDetails')[5]\n)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set blobName",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set Container Name",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "V_blobName",
+					"value": {
+						"value": "@concat(\n    variables('V_blobFolder'),\n    '/',\n    variables('V_fileDateDetails'),\n    replace(\n        variables('V_ContainerName'),\n        pipeline().parameters.P_Version,\n        ''\n    ),\n    '.parquet'\n)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set blobFolder",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set ExtractedDateDetails",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "V_blobFolder",
+					"value": {
+						"value": "@concat(\n    variables('V_extractedFileDateDetails')[0],\n    '-',\n    if(\n        equals(\n            length(variables('V_extractedFileDateDetails')[1]),\n            1\n        ),\n        '0',\n        ''\n    ),\n    variables('V_extractedFileDateDetails')[1]\n)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set ExtractedDateDetails",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "V_extractedFileDateDetails",
+					"value": {
+						"value": "@split(\n    concat(\n        '2',\n        replace(\n            replace(\n                split(\n                    replace(\n                        pipeline().parameters.P_fileName,\n                        '  ',\n                        ' '\n                    ),\n                    '- 2'\n                )[1],\n                '.csv',\n                ''\n            ),\n            ' ',\n            '-'\n        )\n    ),\n    '-'\n)",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"P_fileName": {
+				"type": "string"
+			},
+			"P_hostName": {
+				"type": "string"
+			},
+			"P_userName": {
+				"type": "string"
+			},
+			"P_passwordKey": {
+				"type": "string"
+			},
+			"P_port": {
+				"type": "string"
+			},
+			"P_folder": {
+				"type": "string"
+			},
+			"P_sourceName": {
+				"type": "string"
+			},
+			"P_Version": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"V_ContainerName": {
+				"type": "String"
+			},
+			"V_fileDateDetails": {
+				"type": "String"
+			},
+			"V_blobName": {
+				"type": "String"
+			},
+			"V_blobFolder": {
+				"type": "String"
+			},
+			"V_extractedFileDateDetails": {
+				"type": "Array"
+			}
+		},
+		"folder": {
+			"name": "Generic"
+		},
+		"annotations": []
+	}
+}

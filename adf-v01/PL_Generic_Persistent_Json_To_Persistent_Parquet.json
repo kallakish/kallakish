@@ -1,0 +1,248 @@
+{
+	"name": "PL_Generic_Persistent_Json_To_Persistent_Parquet",
+	"properties": {
+		"activities": [
+			{
+				"name": "Set Source ContainerName",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set Base Container Name",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "V_SourceContainerName",
+					"value": {
+						"value": "@toLower(\n    concat(\n        json(\n            string(pipeline().parameters.P_PipelineParameters)\n        ).SourceVersion,\n        variables('V_BaseContainerName')\n    )\n)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set OutputContainerName",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set Source ContainerName",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "V_SinkContainerName",
+					"value": {
+						"value": "@toLower(\n    concat(\n        json(\n            string(pipeline().parameters.P_PipelineParameters)\n        ).SinkVersion,\n        variables('V_BaseContainerName')\n    )\n)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Container Check",
+				"description": "Check if the container has been created and create if need be",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Set OutputContainerName",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "preparePersistentContainer",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"containerName": {
+							"value": "@variables('V_SinkContainerName')",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set Base Container Name",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "V_BaseContainerName",
+					"value": {
+						"value": "@toLower(\n    json(\n        string(pipeline().parameters.P_PipelineParameters)\n    ).BaseContainerName\n)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get All Folders In Container",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "Container Check",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.00:05:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "persistent_generic_container",
+						"type": "DatasetReference",
+						"parameters": {
+							"persistentContainerName": {
+								"value": "@variables('V_SourceContainerName')",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "JsonReadSettings"
+					}
+				}
+			},
+			{
+				"name": "For each blob in container",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Only process folders",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Only process folders').output.Value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Transfer data",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_Copy_Persistent_Json_To_Parquet_Data_Transfer",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"p_Folder": {
+										"value": "@item().name",
+										"type": "Expression"
+									},
+									"p_SourceContainer": {
+										"value": "@variables('V_SourceContainerName')",
+										"type": "Expression"
+									},
+									"p_SinkContainer": {
+										"value": "@variables('v_SinkContainerName')",
+										"type": "Expression"
+									},
+									"p_LastModifiedDate": {
+										"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).LastModifiedDate",
+										"type": "Expression"
+									},
+									"p_BaseContainerName": {
+										"value": "@variables('v_BaseContainerName')",
+										"type": "Expression"
+									},
+									"p_SourceVersion": {
+										"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).SourceVersion",
+										"type": "Expression"
+									},
+									"p_SinkVersion": {
+										"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).SinkVersion",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Only process folders",
+				"type": "Filter",
+				"dependsOn": [
+					{
+						"activity": "Get All Folders In Container",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get All Folders In Container').output.childItems",
+						"type": "Expression"
+					},
+					"condition": {
+						"value": "@equals(\n    item().type,\n    'Folder'\n)",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"P_PipelineParameters": {
+				"type": "object",
+				"defaultValue": {
+					"BaseContainerName": "",
+					"LastModifiedDate": "2021-01-01 00:00:00",
+					"SourceVersion": "v2",
+					"SinkVersion": "v3"
+				}
+			}
+		},
+		"variables": {
+			"V_SourceContainerName": {
+				"type": "String"
+			},
+			"V_LastModifiedDate": {
+				"type": "String",
+				"defaultValue": "1900-01-01"
+			},
+			"V_SinkContainerName": {
+				"type": "String"
+			},
+			"V_BaseContainerName": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Migration"
+		},
+		"annotations": []
+	}
+}

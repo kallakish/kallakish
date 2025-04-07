@@ -1,0 +1,227 @@
+{
+	"name": "PL_Generic_SFTP_CSV_To_Landing",
+	"properties": {
+		"description": "Extract csv data from an sftp server to landing storage in parquet format",
+		"activities": [
+			{
+				"name": "Get SFTP User Name",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat(\n    'https://mi-vault-',\n    pipeline().globalParameters.environment,\n    '.vault.azure.net/secrets/',\n    json(string(pipeline().parameters.P_PipelineParameters)).userNameKey,\n    '?api-version=7.0'\n)",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "IR-Self-hosted",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "For each file to copy",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get all files to copy",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get all files to copy').output.childItems",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "process data source",
+							"description": "To allow the pipeline to be generic, use sub pipelines to process data from specific sources",
+							"type": "Switch",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"on": {
+									"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).SourceName",
+									"type": "Expression"
+								},
+								"cases": [
+									{
+										"value": "verint",
+										"activities": [
+											{
+												"name": "Copy verint data to landing",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Generic_SFTP_CSV_To_Landing_Copy_Data",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"P_fileName": {
+															"value": "@item().name",
+															"type": "Expression"
+														},
+														"P_hostName": {
+															"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).hostName",
+															"type": "Expression"
+														},
+														"P_userName": {
+															"value": "@activity('Get SFTP User Name').output.value",
+															"type": "Expression"
+														},
+														"P_passwordKey": {
+															"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).passwordKey",
+															"type": "Expression"
+														},
+														"P_port": {
+															"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).port",
+															"type": "Expression"
+														},
+														"P_folder": {
+															"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).folder",
+															"type": "Expression"
+														},
+														"P_sourceName": {
+															"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).SourceName",
+															"type": "Expression"
+														},
+														"P_Version": {
+															"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).Version",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									}
+								],
+								"defaultActivities": [
+									{
+										"name": "Unknown source",
+										"type": "Fail",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"message": {
+												"value": "@concat(\n    'No switch value for the source',\n    json(\n        string(pipeline().parameters.P_PipelineParameters)\n    ).SourceName\n)",
+												"type": "Expression"
+											},
+											"errorCode": {
+												"value": "404",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get all files to copy",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "Get SFTP User Name",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.00:06:00",
+					"retry": 4,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "DS_Generic_SFTP_CSV_List_Files",
+						"type": "DatasetReference",
+						"parameters": {
+							"hostName": {
+								"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).hostName",
+								"type": "Expression"
+							},
+							"userName": {
+								"value": "@activity('Get SFTP User Name').output.value",
+								"type": "Expression"
+							},
+							"passwordKey": {
+								"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).passwordKey",
+								"type": "Expression"
+							},
+							"port": "22",
+							"folder": {
+								"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).folder",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "SftpReadSettings",
+						"recursive": true,
+						"modifiedDatetimeStart": {
+							"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).LastModifiedDate",
+							"type": "Expression"
+						},
+						"modifiedDatetimeEnd": {
+							"value": "@json(\n    string(pipeline().parameters.P_PipelineParameters)\n).EndDate",
+							"type": "Expression"
+						},
+						"enablePartitionDiscovery": false,
+						"disableChunking": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"P_PipelineParameters": {
+				"type": "object",
+				"defaultValue": {
+					"userNameKey": "verint-user",
+					"passwordKey": "verint-password",
+					"hostName": "172.24.50.161",
+					"port": "22",
+					"folder": "training",
+					"Version": "v3",
+					"SourceName": "verint",
+					"LastModifiedDate": "1900-01-01 00:00:00"
+				}
+			}
+		},
+		"folder": {
+			"name": "Generic"
+		},
+		"annotations": []
+	}
+}

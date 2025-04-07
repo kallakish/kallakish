@@ -1,0 +1,246 @@
+{
+	"name": "PL_Generic_Landing_To_Persistent_Parquet_Full",
+	"properties": {
+		"description": "Take file by file (non paginated) from Landing to Persisted Storage",
+		"activities": [
+			{
+				"name": "Container Name",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "v_ContainerName",
+					"value": {
+						"value": "@toLower(concat(json(string(pipeline().parameters.P_PipelineParameters)).Version\n, '-'\n,json(string(pipeline().parameters.P_PipelineParameters)).SourceName\n, '-'\n,json(string(pipeline().parameters.P_PipelineParameters)).SourceSubName\n,if(and(contains(json(string(pipeline().parameters.P_PipelineParameters)), 'FileSubName'), not(empty(json(string(pipeline().parameters.P_PipelineParameters)).FileSubName))), concat('-', json(string(pipeline().parameters.P_PipelineParameters)).FileSubName), '')\n))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Update LastModifiedDate",
+				"description": "Update LastModifiedDate in config.Pipeline in our metadata db so our next delta load will load form that point",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Copy landing to persistent",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.00:05:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[config].[Update_Pipeline_LastModifiedDate]",
+					"storedProcedureParameters": {
+						"PipelineId": {
+							"value": {
+								"value": "@int(json(string(pipeline().parameters.P_PipelineParameters)).PipelineId)",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"LastModifiedDate": {
+							"value": {
+								"value": "@variables('v_LastModifiedDate')",
+								"type": "Expression"
+							},
+							"type": "Datetime"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "LS_Metadata_SQL",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "Update RowCounts",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Copy landing to persistent",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.00:05:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[audit].[Update_CurrentExecutionRowCounts]",
+					"storedProcedureParameters": {
+						"PipelineId": {
+							"value": {
+								"value": "@int(json(string(pipeline().parameters.P_PipelineParameters)).PipelineId)",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"RowsRead": {
+							"value": "-1",
+							"type": "Int32"
+						},
+						"RowsCopied": {
+							"value": "-1",
+							"type": "Int32"
+						},
+						"CurrentExecutionId": {
+							"value": {
+								"value": "@if(\n    contains(\n        json(\n            string(pipeline().parameters.P_PipelineParameters)\n        ),\n        'CurrentExecutionId'\n    ),\n    json(\n        string(pipeline().parameters.P_PipelineParameters)\n    ).CurrentExecutionId,\n    null\n)",
+								"type": "Expression"
+							},
+							"type": "string"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "LS_Metadata_SQL",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "Container Check",
+				"description": "Check if the container has been created and create if need be",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Container Name",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "preparePersistentContainer",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"containerName": {
+							"value": "@variables('v_ContainerName')",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Copy landing to persistent",
+				"description": "Generic Copy Data Task that will copy data from any landing to persistent. Values need to be configured in config.PipelineParameter\n\nThe copy activity will do a full load all the time.",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Container Check",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.16:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ParquetSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"modifiedDatetimeStart": {
+								"value": "@if(equals(formatDateTime(json(string(pipeline().parameters.P_PipelineParameters)).LastModifiedDate, 'yyyy-MM-dd'), '1900-01-01'), formatDateTime(utcnow(), 'yyyy-MM-dd'), json(string(pipeline().parameters.P_PipelineParameters)).LastModifiedDate)",
+								"type": "Expression"
+							},
+							"wildcardFileName": "*.parquet",
+							"enablePartitionDiscovery": false
+						}
+					},
+					"sink": {
+						"type": "ParquetSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "ParquetWriteSettings"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Generic_Parquet_Landing_Container",
+						"type": "DatasetReference",
+						"parameters": {
+							"containerName": {
+								"value": "@variables('v_ContainerName')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Generic_Parquet_Persistent_Container_File",
+						"type": "DatasetReference",
+						"parameters": {
+							"containerName": {
+								"value": "@variables('v_ContainerName')",
+								"type": "Expression"
+							},
+							"folderName": {
+								"value": "@formatDateTime(utcnow(),'yyyy-MM')",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			}
+		],
+		"concurrency": 10,
+		"parameters": {
+			"P_PipelineParameters": {
+				"type": "object",
+				"defaultValue": {
+					"PipelineId": "2001",
+					"ExecutionType": "I",
+					"DateColumn": "P.date_updated",
+					"SourceName": "payment",
+					"SourceSubName": "payment-history",
+					"LastModifiedDate": "2021-01-01 00:00:00",
+					"EndDate": "2021-09-02 16:31:57",
+					"Version": "v2"
+				}
+			}
+		},
+		"variables": {
+			"v_ContainerName": {
+				"type": "String"
+			},
+			"v_LastModifiedDate": {
+				"type": "String",
+				"defaultValue": "1900-01-01"
+			}
+		},
+		"folder": {
+			"name": "Generic"
+		},
+		"annotations": []
+	}
+}

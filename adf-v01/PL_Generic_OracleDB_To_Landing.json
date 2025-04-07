@@ -1,0 +1,419 @@
+{
+	"name": "PL_Generic_OracleDB_To_Landing",
+	"properties": {
+		"activities": [
+			{
+				"name": "Execution Type",
+				"description": "If ExecutionType is I (Incremental/Delta)\n\nThen we need to get the max date we've just imported and update config.Pipeline\n\nF - do nothing",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Copy Oracle To RAW",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(json(string(pipeline().parameters.P_PipelineParameters)).ExecutionType, 'F')",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Set Date Inc",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "v_LastModifiedDate",
+								"value": {
+									"value": "@startOfDay(adddays(variables('v_ParsedEndDate'), 1))",
+									"type": "Expression"
+								}
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Set Date Full",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "v_LastModifiedDate",
+								"value": {
+									"value": "@concat(formatDateTime(utcnow(), 'yyyy-MM-dd'), ' 00:00:00')",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Update RowCounts",
+				"description": "Update row counts in audit.CurrentExecution",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Execution Type",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.00:05:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[audit].[Update_CurrentExecutionRowCounts]",
+					"storedProcedureParameters": {
+						"PipelineId": {
+							"value": {
+								"value": "@int(json(string(pipeline().parameters.P_PipelineParameters)).PipelineId)",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"RowsRead": {
+							"value": {
+								"value": "@int(activity('Copy Oracle To RAW').output.rowsRead)",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"RowsCopied": {
+							"value": {
+								"value": "@int(activity('Copy Oracle To RAW').output.rowsCopied)",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"CurrentExecutionId": {
+							"value": {
+								"value": "@if(\n    contains(\n        json(\n            string(pipeline().parameters.P_PipelineParameters)\n        ),\n        'CurrentExecutionId'\n    ),\n    json(\n        string(pipeline().parameters.P_PipelineParameters)\n    ).CurrentExecutionId,\n    null\n)",
+								"type": "Expression"
+							},
+							"type": "string"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "LS_Metadata_SQL",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "Update LastModifiedDate",
+				"description": "Update LastModifiedDate in config.Pipeline in our metadata db so our next delta load will load form that point",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Execution Type",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.00:05:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[config].[Update_Pipeline_LastModifiedDate]",
+					"storedProcedureParameters": {
+						"PipelineId": {
+							"value": {
+								"value": "@int(json(string(pipeline().parameters.P_PipelineParameters)).PipelineId)",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"LastModifiedDate": {
+							"value": {
+								"value": "@variables('v_LastModifiedDate')",
+								"type": "Expression"
+							},
+							"type": "Datetime"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "LS_Metadata_SQL",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "Set Start Date",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "v_StartDate",
+					"value": {
+						"value": "@if(and(contains(json(string(pipeline().parameters.P_PipelineParameters)), 'LastModifiedDate'), not(empty(json(string(pipeline().parameters.P_PipelineParameters)).LastModifiedDate))), json(string(pipeline().parameters.P_PipelineParameters)).LastModifiedDate, 'None')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Parse Start Date",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set Start Date",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "v_ParsedStartDate",
+					"value": {
+						"value": "@if(equals(variables('v_StartDate'), 'None'), 'None', if(greater(ticks(variables('v_StartDate')), sub(ticks(startOfDay(utcnow())), 1)), formatDateTime(getPastTime(1, 'Day'), 'yyyy-MM-dd'), formatDateTime(variables('v_StartDate'), 'yyyy-MM-dd')))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set End Date",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "v_EndDate",
+					"value": {
+						"value": "@if(and(contains(json(string(pipeline().parameters.P_PipelineParameters)), 'EndDate'), not(empty(json(string(pipeline().parameters.P_PipelineParameters)).EndDate))), json(string(pipeline().parameters.P_PipelineParameters)).EndDate, 'None')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Parse End Date",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set End Date",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "v_ParsedEndDate",
+					"value": {
+						"value": "@if(equals(variables('v_EndDate'), 'None'), 'None', if(greater(ticks(variables('v_EndDate')), sub(ticks(startOfDay(utcnow())), 1)), formatDateTime(getPastTime(1, 'Day'), 'yyyy-MM-dd'), formatDateTime(variables('v_EndDate'), 'yyyy-MM-dd')))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Generate SQL",
+				"description": "The lookup 'Generate SQL' will generate the required columns of each oracle source table to prepare the SQL for the copy activity",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Parse End Date",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Parse Start Date",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "OracleSource",
+						"oracleReaderQuery": {
+							"value": "@if(and(contains(json(string(pipeline().parameters.P_PipelineParameters)),'UseWildcard'), equals(json(string(pipeline().parameters.P_PipelineParameters)).UseWildcard, 'Y')),'select * from dual',concat('SELECT OWNER,\nTABLE_NAME,\nLISTAGG(CASE WHEN DATA_TYPE=''DATE'' THEN ( CASE WHEN COLUMN_NAME = ''' , if(and(contains(json(string(pipeline().parameters.P_PipelineParameters)), 'TruncateDateColumnName'), not(empty(json(string(pipeline().parameters.P_PipelineParameters)).TruncateDateColumnName))), json(string(pipeline().parameters.P_PipelineParameters)).TruncateDateColumnName, 'None') ,''' THEN CONCAT(CONCAT(CONCAT(''TRUNC('',COLUMN_NAME) ,'') AS ''),COLUMN_NAME) ELSE \nCONCAT(CONCAT(CONCAT(''TO_DATE('',COLUMN_NAME) ,'') AS ''),COLUMN_NAME) END) ELSE COLUMN_NAME END,'','')\nWITHIN GROUP (ORDER BY OWNER, TABLE_NAME) AS NEW_COLUMN\n FROM ALL_TAB_COLUMNS WHERE TABLE_NAME=''',json(string(pipeline().parameters.P_PipelineParameters)).SOURCETABLE,\n''' AND OWNER=''',json(string(pipeline().parameters.P_PipelineParameters)).SOURCESCHEMA,\n''' GROUP BY OWNER, TABLE_NAME'))",
+							"type": "Expression"
+						},
+						"partitionOption": "None",
+						"convertDecimalToInteger": false,
+						"queryTimeout": "02:00:00"
+					},
+					"dataset": {
+						"referenceName": "DS_Generic_Oracle",
+						"type": "DatasetReference",
+						"parameters": {
+							"SchemaName": {
+								"value": "@json(string(pipeline().parameters.P_PipelineParameters)).SourceSchema",
+								"type": "Expression"
+							},
+							"Tablename": {
+								"value": "@json(string(pipeline().parameters.P_PipelineParameters)).SourceTable",
+								"type": "Expression"
+							},
+							"ConnectionStringSecret": {
+								"value": "@json(string(pipeline().parameters.P_PipelineParameters)).ConnectionStringSecret",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Copy Oracle To RAW",
+				"description": "Generic Copy Data Task that will copy data from any Oracle source to RAW. Values need to be configured in config.PipelineParameter\n\nThe query will do a full load all the time.\n\nTimeout set to 11 hours 30 minutes with one retry so that the total time taken does not go over 23 hours. For ingestions expected to take longer, use the Long_Timeout pipeline.",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Generate SQL",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.11:30:00",
+					"retry": 1,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "OracleSource",
+						"additionalColumns": [
+							{
+								"name": "extraction_date",
+								"value": {
+									"value": "@string(formatDateTime(utcnow(), 'yyyy-MM-dd'))",
+									"type": "Expression"
+								}
+							}
+						],
+						"oracleReaderQuery": {
+							"value": "@{if(contains(json(string(pipeline().parameters.P_PipelineParameters)), 'CustomQuery'), replace(replace(json(string(pipeline().parameters.P_PipelineParameters)).CustomQuery, '{startDate}', variables('v_ParsedStartDate')), '{endDate}', variables('v_ParsedEndDate')) ,if(equals(json(string(pipeline().parameters.P_PipelineParameters)).ExecutionType, 'F')\n, concat(\n\tconcat('select ',if(and(contains(json(string(pipeline().parameters.P_PipelineParameters)),'UseWildcard'), equals(json(string(pipeline().parameters.P_PipelineParameters)).UseWildcard, 'Y')), ' * ', activity('Generate SQL').output.value[0].NEW_COLUMN), ' FROM ')\n\t, json(string(pipeline().parameters.P_PipelineParameters)).SourceSchema\n\t, '.'\n\t, json(string(pipeline().parameters.P_PipelineParameters)).SourceTable\n        , if(and(contains(json(string(pipeline().parameters.P_PipelineParameters)), 'AdditionalFilters'), not(empty(json(string(pipeline().parameters.P_PipelineParameters)).AdditionalFilters))), concat(' WHERE ',  json(string(pipeline().parameters.P_PipelineParameters)).AdditionalFilters, ';')\n\t, ';')\n\t)\n, concat(\n\tconcat('select ', if(and(contains(json(string(pipeline().parameters.P_PipelineParameters)),'UseWildcard'), equals(json(string(pipeline().parameters.P_PipelineParameters)).UseWildcard, 'Y')), ' * ', activity('Generate SQL').output.value[0].NEW_COLUMN), ' FROM ')\n\t, json(string(pipeline().parameters.P_PipelineParameters)).SourceSchema\n\t, '.'\n\t, json(string(pipeline().parameters.P_PipelineParameters)).SourceTable\n\t, ' WHERE NVL(' \n\t, json(string(pipeline().parameters.P_PipelineParameters)).DateColumn, ',', if(contains(json(string(pipeline().parameters.P_PipelineParameters)),'SecondaryDateColumn'), json(string(pipeline().parameters.P_PipelineParameters)).SecondaryDateColumn, 'NULL')\n\t, ') BETWEEN '\n\t, concat('to_date(''',variables('v_ParsedStartDate'),' 00:00:00''',concat(','),'''YYYY-MM-DD HH24:MI:SS''',')') ,  ' AND ' \n\t, concat('to_date(''',variables('v_ParsedEndDate'),' 23:59:59''',concat(','),'''YYYY-MM-DD HH24:MI:SS''',')')\n        , if(and(contains(json(string(pipeline().parameters.P_PipelineParameters)), 'AdditionalFilters'), not(empty(json(string(pipeline().parameters.P_PipelineParameters)).AdditionalFilters))),  concat(''' AND ',  json(string(pipeline().parameters.P_PipelineParameters)).AdditionalFilters, ';')\n\t, ';')\n\t)\n))}",
+							"type": "Expression"
+						},
+						"partitionOption": "None",
+						"convertDecimalToInteger": false,
+						"queryTimeout": "11:30:00"
+					},
+					"sink": {
+						"type": "ParquetSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "ParquetWriteSettings"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Generic_Oracle",
+						"type": "DatasetReference",
+						"parameters": {
+							"SchemaName": {
+								"value": "@json(string(pipeline().parameters.P_PipelineParameters)).SourceSchema",
+								"type": "Expression"
+							},
+							"Tablename": {
+								"value": "@json(string(pipeline().parameters.P_PipelineParameters)).SourceTable",
+								"type": "Expression"
+							},
+							"ConnectionStringSecret": {
+								"value": "@json(string(pipeline().parameters.P_PipelineParameters)).ConnectionStringSecret",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Generic_Parquet_Landing_File",
+						"type": "DatasetReference",
+						"parameters": {
+							"containerName": {
+								"value": "@toLower(concat(json(string(pipeline().parameters.P_PipelineParameters)).Version\n, '-'\n,json(string(pipeline().parameters.P_PipelineParameters)).SourceName\n, '-'\n,json(string(pipeline().parameters.P_PipelineParameters)).SourceSubName\n, '-'\n,replace(json(string(pipeline().parameters.P_PipelineParameters)).FileSubName,'_','-')\n))",
+								"type": "Expression"
+							},
+							"fileName": {
+								"value": "@toLower(concat(\nif(equals(json(string(pipeline().parameters.P_PipelineParameters)).ExecutionType, 'F'),\nformatDateTime(utcnow(), 'yyyy-MM-dd'),\nconcat(variables('v_ParsedStartDate'), '-', variables('v_ParsedEndDate')))\n, '-'\n, json(string(pipeline().parameters.P_PipelineParameters)).Version \n, '-'\n, json(string(pipeline().parameters.P_PipelineParameters)).SourceName\n,'-'\n,replace(json(string(pipeline().parameters.P_PipelineParameters)).SourceSubName,'_','-')\n,'-'\n,replace(json(string(pipeline().parameters.P_PipelineParameters)).FileSubName,'_','-')\n,'.parquet'\n))",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			}
+		],
+		"concurrency": 10,
+		"parameters": {
+			"P_PipelineParameters": {
+				"type": "object",
+				"defaultValue": {
+					"PipelineId": "19001",
+					"ExecutionType": "F",
+					"SourceName": "cgi",
+					"ConnectionStringSecret": "cgi-oracle-azure-caseman-db-connection-string",
+					"FileSubName": "AE-PER-ITEMS",
+					"SourceTable": "AE_PER_ITEMS",
+					"SourceSchema": "CMAN",
+					"SourceSubName": "caseman",
+					"DateColumn": "na",
+					"EndDate": "2100-01-01 00:00:00",
+					"LastModifiedDate": "1900-01-01 00:00:00",
+					"Version": "v2"
+				}
+			}
+		},
+		"variables": {
+			"v_LastModifiedDate": {
+				"type": "String",
+				"defaultValue": "1900-01-01"
+			},
+			"v_StartDate": {
+				"type": "String",
+				"defaultValue": "None"
+			},
+			"v_ParsedStartDate": {
+				"type": "String",
+				"defaultValue": "None"
+			},
+			"v_EndDate": {
+				"type": "String",
+				"defaultValue": "None"
+			},
+			"v_ParsedEndDate": {
+				"type": "String",
+				"defaultValue": "None"
+			}
+		},
+		"folder": {
+			"name": "Generic"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-06-30T16:40:27Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
