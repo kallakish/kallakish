@@ -1,1 +1,20 @@
 
+AND (
+    ISNULL(t.LastSuccessfullExecution, '1900-01-01 00:00:00') <=
+        CASE T.TriggerType
+            WHEN 'S' THEN t.ActiveFrom
+            WHEN 'D' THEN GETUTCDATE()
+            WHEN 'W' THEN CASE WHEN DATEPART(weekday, GETUTCDATE()) = t.FrequencyInterval THEN GETUTCDATE() END
+            WHEN 'M' THEN CASE WHEN DAY(GETUTCDATE()) = t.FrequencyInterval THEN GETUTCDATE() END
+            WHEN 'H' THEN
+                CASE 
+                    -- Only pick pipelines where current time is within 10 min before StartHour
+                    WHEN DATEPART(HOUR, GETUTCDATE()) = (t.StartHour + 24 - 1) % 24 
+                         AND DATEPART(MINUTE, GETUTCDATE()) >= 50 THEN GETUTCDATE()
+                    WHEN DATEPART(HOUR, GETUTCDATE()) = t.StartHour 
+                         AND DATEPART(MINUTE, GETUTCDATE()) <= 10 THEN GETUTCDATE()
+                END
+            ELSE GETUTCDATE()
+        END
+    OR p.PipelineId = @PipelineId
+)
