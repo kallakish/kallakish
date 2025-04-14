@@ -1,7 +1,20 @@
-I hope you are doing well.
+Subject: Request for Key Vault Access and Elevated Permissions to Proceed with Fabric and ADF Integration
 
-As part of our ongoing DevOps organization cleanup, we need to review the last activity of various organizations to determine their usage status. We recently raised a request with Microsoft regarding this, and they have recommended that we obtain Project Collection Admin access to proceed with the necessary assessments.
+Hi [Tenant Owner's Name],
 
-Given this guidance, I would like to request your approval to be assigned the Project Collection Admin role. This will enable us to effectively gather insights and proceed with the cleanup as advised.
+I hope you’re doing well.
 
-Please let me know if you need any further details. Looking forward to your confirmation.
+We’ve successfully configured our Git integration for the project, and we’re now ready to prioritize the setup for both Microsoft Fabric pipelines and Azure Data Factory (ADF) deployments. To move forward, we’ll need access to the Azure Key Vault within the tenant, as the current access policy restrictions are preventing us from configuring the required secrets and permissions for our deployments.
+
+Additionally, it would be extremely helpful if either Liv or Lewish could be granted elevated permissions or a Privileged Identity Management (PIM) role assignment. This would allow us to configure the necessary permissions ourselves — both for the Key Vault and for the wider deployment process — and help avoid delays caused by permission dependencies.
+
+Could you kindly assist with granting the Key Vault access and reviewing the elevated permission request for Liv or Lewish? This will enable us to streamline the configuration process and proceed with the setup efficiently.
+
+Appreciate your help, and please let us know if you need any further details from our side.
+
+Thank you!
+
+Best regards,
+[Your Full Name]
+[Your Job Title]
+[Your Contact Information]
