@@ -1,20 +1,13 @@
-Subject: Request for Key Vault Access and Elevated Permissions to Proceed with Fabric and ADF Integration
+Subject: Request for VM Setup Details for Azure Fabric Gateway and ADF Integration Runtime
 
-Hi [Tenant Owner's Name],
+Hi Patrick,
 
-I hope you’re doing well.
+I hope you're doing well.
 
-We’ve successfully configured our Git integration for the project, and we’re now ready to prioritize the setup for both Microsoft Fabric pipelines and Azure Data Factory (ADF) deployments. To move forward, we’ll need access to the Azure Key Vault within the tenant, as the current access policy restrictions are preventing us from configuring the required secrets and permissions for our deployments.
+I’m from the Data Engineering team and was looking into setting up a VM for the Azure Fabric Gateway and ADF Integration Runtime, where the VM would be able to connect to on-premises database servers and ingest data into the Azure cloud.
 
-Additionally, it would be extremely helpful if either Liv or Lewish could be granted elevated permissions or a Privileged Identity Management (PIM) role assignment. This would allow us to configure the necessary permissions ourselves — both for the Key Vault and for the wider deployment process — and help avoid delays caused by permission dependencies.
+Debbie mentioned that you have already completed the initial VM setup as per the email below. Could you please let me know if we can get the setup details? I would also like to confirm if the VM is ready and suitable for use with our Azure Fabric and ADF requirements.
 
-Could you kindly assist with granting the Key Vault access and reviewing the elevated permission request for Liv or Lewish? This will enable us to streamline the configuration process and proceed with the setup efficiently.
+Looking forward to hearing from you.
 
-Appreciate your help, and please let us know if you need any further details from our side.
-
-Thank you!
-
-Best regards,
-[Your Full Name]
-[Your Job Title]
-[Your Contact Information]
+Thanks and regards,
