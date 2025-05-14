@@ -1,0 +1,60 @@
+# Notebook parameters (can be passed from Pipeline)
+table_name = dbutils.widgets.get("table_name")  # e.g., "Sales.Customer"
+key_vault_name = dbutils.widgets.get("key_vault_name")  # e.g., "my-keyvault"
+secret_name = dbutils.widgets.get("secret_name")  # e.g., "sql-conn-string"
+
+
+
+from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
+from datetime import datetime
+
+# Construct Key Vault URL
+key_vault_url = f"https://{key_vault_name}.vault.azure.net/"
+
+# Authenticate and retrieve secret
+credential = DefaultAzureCredential()
+client = SecretClient(vault_url=key_vault_url, credential=credential)
+jdbc_url = client.get_secret(secret_name).value
+
+
+
+
+
+
+# Get current date for path
+now = datetime.now()
+year = f"Year_{now.year}"
+month = f"Month_{now.month:02d}"
+day = f"Day_{now.day:02d}"
+
+# Target Lakehouse Bronze folder path
+bronze_path = f"Files/Bronze/{year}/{month}/{day}/{table_name.replace('.', '_')}.parquet"
+
+print("Lakehouse write path:", bronze_path)
+
+
+
+
+df = spark.read.format("jdbc") \
+    .option("url", jdbc_url) \
+    .option("dbtable", table_name) \
+    .option("driver", "com.microsoft.sqlserver.jdbc.SQLServerDriver") \
+    .load()
+
+df.show()
+
+
+df.write.mode("overwrite").format("parquet").save(bronze_path)
+
+
+
+
+jdbc:sqlserver://myazuresqlserver.database.windows.net:1433;
+database=salesdb;
+user=fabricuser@myazuresqlserver;
+password=MyStrongP@ssw0rd!;
+encrypt=true;
+trustServerCertificate=false;
+hostNameInCertificate=*.database.windows.net;
+loginTimeout=30;
