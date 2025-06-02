@@ -1,0 +1,97 @@
+Naming Conventions for Microsoft Fabric (Medallion Architecture) - Template
+This template is designed to help you establish clear, consistent, and understandable naming conventions for your Microsoft Fabric data platform, particularly for a metadata-driven Medallion architecture.
+
+1. General Principles
+Clarity & Readability: Names should be descriptive and easy to understand.
+Consistency: Apply the chosen convention uniformly across all Fabric items.
+Case: Define your preferred casing (e.g., PascalCase, camelCase, snake_case, UPPER_SNAKE_CASE) for:
+Fabric Items (Workspaces, Lakehouses, Warehouses, Pipelines, Dataflows, Notebooks): [Your_Casing_Convention_xxxxx]
+Lakehouse/Warehouse Tables & Columns: [Your_Casing_Convention_xxxxx]
+Prefixes/Suffixes: Determine if and how you will use prefixes (e.g., for layers, item types) and suffixes (e.g., for actions, frequencies).
+Abbreviations: Establish and document a list of standard abbreviations.
+Delimiters: Choose your standard delimiter (e.g., _, -) for separating components in names. [Your_Delimiter_Choice_xxxxx]
+Conciseness: Aim for descriptive yet reasonably short names, being mindful of any character limits within Fabric.
+2. Common Abbreviations
+Define your organization's standard abbreviations here.
+
+Abbreviation	Full Form
+[Abbr1_xxxxx]	[FullForm1_xxxxx]
+[Abbr2_xxxxx]	[FullForm2_xxxxx]
+[Abbr3_xxxxx]	[FullForm3_xxxxx]
+PL	Pipeline
+DF	Dataflow Gen2
+NB	Notebook
+LH	Lakehouse
+WH	Warehouse
+SQL	SQL Script/Endpoint Artifact
+SP	Stored Procedure (in WH)
+FN	Function (in WH or NB)
+VW	View
+BRZ	Bronze
+SLV	Silver
+GLD	Gold
+ING	Ingestion
+TRF	Transform
+LOAD	Load
+MD	Metadata Driven
+CFG	Configuration
+CTL	Control (for control tables)
+LOG	Log
+[Your_Abbr_xxxxx]	[Your_FullForm_xxxxx]
+...	...
+3. Workspace Naming
+Convention: [Your_Workspace_Convention_xxxxx]
+4. Lakehouse (LH) and Warehouse (WH) Naming
+Bronze Lakehouse Convention: [Your_Bronze_LH_Convention_xxxxx]
+Silver Lakehouse Convention: [Your_Silver_LH_Convention_xxxxx]
+Gold Warehouse Convention (SQL Analytics Endpoint over Delta Lake): [Your_Gold_WH_Convention_xxxxx]
+5. Data Ingestion (Source -> Bronze Lakehouse)
+Pipelines (PL):
+Specific Entity Convention: [Your_Convention_Here_xxxxx]
+Metadata-Driven Generic Convention: [Your_Convention_Here_xxxxx]
+Dataflows (DF) (if used for ingestion):
+Convention: [Your_Convention_Here_xxxxx]
+Notebooks (NB) (if used for complex ingestion logic):
+Convention: [Your_Convention_Here_xxxxx]
+Bronze Lakehouse Tables:
+Naming Convention: [Your_Convention_Here_xxxxx]
+Schema (within Lakehouse): [Your_Schema_Name_Convention_xxxxx]
+6. Data Transformation (Bronze -> Silver Lakehouse)
+Pipelines (PL):
+Specific Entity Convention: [Your_Convention_Here_xxxxx]
+Metadata-Driven Generic Convention: [Your_Convention_Here_xxxxx]
+Dataflows (DF):
+Convention: [Your_Convention_Here_xxxxx]
+Notebooks (NB):
+Convention: [Your_Convention_Here_xxxxx]
+Silver Lakehouse Tables (Delta Tables):
+Dimension Table Convention: [Your_Convention_Here_xxxxx]
+Fact Table Convention: [Your_Convention_Here_xxxxx]
+Other Table Convention: [Your_Convention_Here_xxxxx]
+Schema (within Lakehouse): [Your_Schema_Name_Convention_xxxxx]
+7. Data Transformation (Silver Lakehouse -> Gold Data Warehouse)
+Pipelines (PL):
+Specific Mart/Aggregate Convention: [Your_Convention_Here_xxxxx]
+Metadata-Driven Generic Convention: [Your_Convention_Here_xxxxx]
+Dataflows (DF):
+Convention: [Your_Convention_Here_xxxxx]
+Notebooks (NB):
+Convention: [Your_Convention_Here_xxxxx]
+SQL Scripts / Stored Procedures (SP) (within Gold WH):
+SQL Script Convention: [Your_Convention_Here_xxxxx]
+Stored Procedure Convention: [Your_Convention_Here_xxxxx]
+Gold Warehouse Tables & Views (Delta Tables via SQL Analytics Endpoint):
+Dimension Table Convention: [Your_Convention_Here_xxxxx]
+Fact Table Convention: [Your_Convention_Here_xxxxx]
+View Convention: [Your_Convention_Here_xxxxx]
+Schema (within Warehouse): [Your_Schema_Name_Convention_xxxxx]
+8. Orchestration & Metadata-Driven Items
+Main Orchestration Pipelines:
+Convention: [Your_Convention_Here_xxxxx]
+Metadata-Related Notebooks/Dataflows:
+Convention: [Your_Convention_Here_xxxxx]
+Metadata Tables (e.g., in a dedicated Lakehouse/Warehouse or utility schema):
+Configuration Table Convention: [Your_Convention_Here_xxxxx]
+Control Table Convention: [Your_Convention_Here_xxxxx]
+Log Table Convention: [Your_Convention_Here_xxxxx]
+Schema for Metadata Tables: [Your_Schema_Name_Convention_xxxxx]
