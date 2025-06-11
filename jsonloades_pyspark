@@ -1,0 +1,29 @@
+import json
+
+# Sample JSON string input (usually passed from pipeline or user input)
+p_json_param = '''
+{
+    "workspacename": "a3e4d0e6-a3e4d0e6",
+    "accountname": "onelake",
+    "relativepath": "62139ac1-f383/Files/bronze",
+    "db_bronzefolder": "STORM",
+    "todays_file": "Year 2025/Month 06/Day 06"
+}
+'''
+
+# Parse the JSON string
+params = json.loads(p_json_param)
+
+# Extract individual parameters
+p_workspacename = params.get("workspacename")
+p_accountname = params.get("accountname")
+p_relativepath = params.get("relativepath")
+p_bronzefolder = params.get("db_bronzefolder")
+p_todays_file = params.get("todays_file")
+
+# Print the values (or use them in further notebook logic)
+print("Workspace Name:", p_workspacename)
+print("Account Name:", p_accountname)
+print("Relative Path:", p_relativepath)
+print("Bronze Folder:", p_bronzefolder)
+print("Today's File:", p_todays_file)
