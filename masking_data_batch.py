@@ -156,3 +156,77 @@ for file_name in csv_files:
     mask_csv_file(full_path, file_name)
 
 print("🎉 Data masking completed.")
+
+
+
+
+
+
+
+import os
+import pandas as pd
+import hashlib
+
+# === PARAMETERS ===
+input_dir = "/lakehouse/default/Files/bronze/Temp/DataMasking"
+output_dir = os.path.join(input_dir, "masked")
+salt = "FABRIC_MASKING_SALT"
+
+# Fetch file name from Fabric pipeline parameters
+input_file_name = notebook_params.get("input_file_name", None)
+
+if not input_file_name:
+    raise ValueError("❌ Missing required parameter: 'input_file_name'.")
+
+input_file_path = os.path.join(input_dir, input_file_name)
+output_file_path = os.path.join(output_dir, input_file_name)
+
+# === MASKING HELPERS ===
+
+def is_id_column(column_name):
+    return column_name.lower().endswith("id")
+
+def mask_value(val, salt):
+    if pd.isnull(val):
+        return val
+    return hashlib.sha256((salt + str(val)).encode()).hexdigest()
+
+def mask_large_csv(input_path, output_path, chunk_size=100000):
+    print(f"🔄 Masking: {os.path.basename(input_path)}")
+    try:
+        chunk_iter = pd.read_csv(input_path, chunksize=chunk_size, on_bad_lines='warn', engine='python')
+    except Exception as e:
+        print(f"❌ Failed to read CSV: {e}")
+        return False
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    first_chunk = True
+    chunk_num = 0
+
+    for chunk in chunk_iter:
+        chunk_num += 1
+        print(f"   📦 Processing chunk {chunk_num}")
+
+        for col in chunk.columns:
+            if not is_id_column(col) and chunk[col].dtype == object:
+                chunk[col] = chunk[col].apply(lambda x: mask_value(x, salt))
+
+        try:
+            chunk.to_csv(output_path, mode='w' if first_chunk else 'a', index=False, header=first_chunk)
+            first_chunk = False
+        except Exception as e:
+            print(f"❌ Failed to write chunk {chunk_num}: {e}")
+            return False
+
+    print(f"✅ Masked file saved to: {output_path}")
+    return True
+
+# === RUN MASKING ===
+
+success = mask_large_csv(input_file_path, output_file_path)
+
+if not success:
+    raise RuntimeError(f"❌ Masking failed for file: {input_file_name}")
+else:
+    print("🎉 File processed successfully.")
+
