@@ -7,6 +7,14 @@ input_dir = "/lakehouse/default/Files/input_csvs"
 output_dir = os.path.join(input_dir, "masked")
 salt = "FABRIC_MASKING_SALT"
 
+all_files = os.listdir(input_dir)
+csv_files = [f for f in all_files if f.endswith(".csv")]
+
+print(f"📂 Files found in '{input_dir}':")
+for f in csv_files:
+    print(f"   - {f}")
+
+
 # --- Masking Logic ---
 def mask_value(val, salt=""):
     if pd.isna(val):
