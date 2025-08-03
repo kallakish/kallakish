@@ -73,3 +73,69 @@ file_names = [os.path.basename(row.file_name) for row in files_df.collect()]
 print(f"📂 Found {len(file_names)} CSV files in {input_dir}:")
 for f in file_names:
     print(f"   - {f}")
+
+
+
+
+
+
+import os
+import pandas as pd
+import hashlib
+from pyspark.sql.functions import input_file_name
+
+# --- Config ---
+input_dir = "/lakehouse/default/Files/input_csvs"
+output_dir = os.path.join(input_dir, "masked")
+salt = "FABRIC_MASKING_SALT"
+
+# Create output directory if it doesn't exist (Fabric handles this under the hood)
+os.makedirs(output_dir, exist_ok=True)
+
+# Helper: Check if column is an ID
+def is_id_column(column_name):
+    return column_name.lower().endswith("id")
+
+# Helper: Consistent masking using SHA256
+def mask_value(val, salt):
+    if pd.isnull(val):
+        return val
+    return hashlib.sha256((salt + str(val)).encode()).hexdigest()
+
+# Main masking function
+def mask_csv_file(file_path, file_name):
+    print(f"🔄 Processing: {file_name}")
+    try:
+        df = pd.read_csv(file_path, on_bad_lines='warn', engine='python')
+    except Exception as e:
+        print(f"❌ Error reading {file_name}: {e}")
+        return
+
+    # Apply masking
+    for col in df.columns:
+        if not is_id_column(col) and df[col].dtype == object:
+            df[col] = df[col].apply(lambda x: mask_value(x, salt))
+
+    # Write to output
+    output_path = os.path.join(output_dir, file_name)
+    try:
+        df.to_csv(output_path, index=False)
+        print(f"✅ Masked and saved to: {output_path}")
+    except Exception as e:
+        print(f"❌ Failed to save masked file: {file_name}. Error: {e}")
+
+# List files using Spark (works with Lakehouse)
+try:
+    df_sample = spark.read.option("header", True).csv(f"{input_dir}/*.csv")
+    files_df = df_sample.withColumn("file_name", input_file_name()).select("file_name").distinct()
+    file_names = [os.path.basename(row.file_name) for row in files_df.collect()]
+except Exception as e:
+    print(f"❌ Failed to list CSVs in {input_dir}: {e}")
+    file_names = []
+
+# Process each file
+for file_name in file_names:
+    full_path = os.path.join(input_dir, file_name)
+    mask_csv_file(full_path, file_name)
+
+print("🎉 Masking complete.")
