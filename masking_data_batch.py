@@ -53,3 +53,23 @@ for file_name in csv_files:
     mask_csv_file(full_path, file_name)
 
 print("🎉 All files masked.")
+
+
+
+
+
+from pyspark.sql.functions import input_file_name
+
+input_dir = "/lakehouse/default/Files/input_csvs"
+output_dir = input_dir + "/masked"
+salt = "FABRIC_MASKING_SALT"
+
+# List all CSV files in the input_dir
+df = spark.read.format("csv").option("header", "true").load(f"{input_dir}/*.csv")
+files_df = df.withColumn("file_name", input_file_name()).select("file_name").distinct()
+
+file_names = [os.path.basename(row.file_name) for row in files_df.collect()]
+
+print(f"📂 Found {len(file_names)} CSV files in {input_dir}:")
+for f in file_names:
+    print(f"   - {f}")
