@@ -139,3 +139,20 @@ for file_name in file_names:
     mask_csv_file(full_path, file_name)
 
 print("🎉 Masking complete.")
+
+
+
+try:
+    all_files = os.listdir(input_dir)
+    csv_files = [f for f in all_files if f.lower().endswith(".csv")]
+    print(f"📁 Found {len(csv_files)} CSV files.")
+except Exception as e:
+    print(f"❌ Could not list files in {input_dir}: {e}")
+    csv_files = []
+
+# Process each file
+for file_name in csv_files:
+    full_path = os.path.join(input_dir, file_name)
+    mask_csv_file(full_path, file_name)
+
+print("🎉 Data masking completed.")
