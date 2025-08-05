@@ -73,3 +73,78 @@ if not success:
     raise RuntimeError(f"❌ Failed to mask file: {input_file_name}")
 else:
     print("🎉 File processed successfully.")
+
+
+
+
+
+
+import os
+import hashlib
+import pandas as pd
+from uuid import uuid4
+from pathlib import Path
+
+# Set paths
+input_dir = "/lakehouse/default/Files/bronze/Temp/DataMasking"
+output_dir = os.path.join(input_dir, "masked")
+os.makedirs(output_dir, exist_ok=True)
+
+# Reusable cache to ensure consistency of masked values
+global_mask_cache = {}
+salt = "FABRIC_MASKING_SALT"
+
+# Helper: Identify ID columns (simple rule)
+def is_id_column(col_name):
+    col_name_lower = col_name.lower()
+    return col_name_lower in ["id", "person_id", "user_id"] or col_name_lower.endswith("_id")
+
+# Helper: Consistent masking with cache
+def mask_value(col_name, val):
+    if pd.isna(val) or val == "":
+        return val
+    key = f"{col_name}|{val}"
+    if key in global_mask_cache:
+        return global_mask_cache[key]
+    else:
+        # Use hash to get consistent and reversible value
+        hashed = hashlib.sha256((salt + key).encode()).hexdigest()
+        masked_val = f"{col_name.upper()}_MASK_{hashed[:8]}"
+        global_mask_cache[key] = masked_val
+        return masked_val
+
+# Helper: Mask a single dataframe
+def mask_dataframe(df):
+    for col in df.columns:
+        if df[col].dtype == "object" and not is_id_column(col):
+            df[col] = df[col].apply(lambda val: mask_value(col, val))
+    return df
+
+# Process all CSVs
+csv_files = [f for f in os.listdir(input_dir) if f.endswith(".csv")]
+print(f"✅ Found {len(csv_files)} CSV files.")
+
+error_files = []
+
+for file in csv_files:
+    input_path = os.path.join(input_dir, file)
+    output_path = os.path.join(output_dir, file)
+
+    try:
+        print(f"🔄 Processing {file}...")
+        df = pd.read_csv(input_path, on_bad_lines='skip')  # skip bad lines if any
+        masked_df = mask_dataframe(df)
+        masked_df.to_csv(output_path, index=False)
+        print(f"✅ Done: {file} → {output_path}")
+    except Exception as e:
+        print(f"❌ Failed: {file} - {e}")
+        error_files.append((file, str(e)))
+
+# Summary
+print("\n🔚 Batch processing complete.")
+if error_files:
+    print("⚠️ Some files failed:")
+    for file, err in error_files:
+        print(f"  - {file}: {err}")
+else:
+    print("🎉 All files processed successfully.")
