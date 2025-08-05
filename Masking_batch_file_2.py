@@ -148,3 +148,82 @@ if error_files:
         print(f"  - {file}: {err}")
 else:
     print("🎉 All files processed successfully.")
+
+
+
+
+import os
+import hashlib
+import pandas as pd
+from pathlib import Path
+
+# Define input/output directories
+input_dir = "/lakehouse/default/Files/bronze/Temp/DataMasking"
+output_dir = os.path.join(input_dir, "masked")
+os.makedirs(output_dir, exist_ok=True)
+
+# Global salt for masking (to keep consistency across runs)
+salt = "FABRIC_MASKING_SALT"
+
+# Cache for consistent masking
+global_mask_cache = {}
+
+# Identify ID columns by name
+def is_id_column(col_name):
+    col_name_lower = col_name.lower()
+    return col_name_lower in ["id", "person_id", "user_id"] or col_name_lower.endswith("_id")
+
+# Consistent masking function
+def mask_value(col_name, val):
+    if pd.isna(val) or val == "":
+        return val
+    key = f"{col_name}|{val}"
+    if key in global_mask_cache:
+        return global_mask_cache[key]
+    # Create consistent hash-based mask
+    hashed = hashlib.sha256((salt + key).encode()).hexdigest()
+    masked_val = f"{col_name.upper()}_MASK_{hashed[:8]}"
+    global_mask_cache[key] = masked_val
+    return masked_val
+
+# Apply masking to DataFrame
+def mask_dataframe(df):
+    for col in df.columns:
+        if df[col].dtype == "object" and not is_id_column(col):
+            df[col] = df[col].apply(lambda val: mask_value(col, val))
+    return df
+
+# List all CSVs in the input directory
+try:
+    csv_files = [f for f in os.listdir(input_dir) if f.endswith(".csv")]
+except Exception as e:
+    raise RuntimeError(f"❌ Could not list files in input directory: {e}")
+
+print(f"📂 Found {len(csv_files)} CSV files in '{input_dir}'")
+
+# Process each file
+error_files = []
+
+for file in csv_files:
+    input_path = os.path.join(input_dir, file)
+    output_path = os.path.join(output_dir, file)
+
+    try:
+        print(f"🔄 Processing {file}...")
+        df = pd.read_csv(input_path, on_bad_lines='skip')  # Skip malformed lines
+        masked_df = mask_dataframe(df)
+        masked_df.to_csv(output_path, index=False)
+        print(f"✅ Masked file written to: {output_path}")
+    except Exception as e:
+        print(f"❌ Failed to process {file}: {e}")
+        error_files.append((file, str(e)))
+
+# Summary
+print("\n📊 Masking complete.")
+if error_files:
+    print("⚠️ The following files failed to process:")
+    for f, err in error_files:
+        print(f" - {f}: {err}")
+else:
+    print("🎉 All files processed successfully.")
+
