@@ -15,7 +15,9 @@ spark = SparkSession.builder.getOrCreate()
 from mssparkutils import fs as mssfs
 
 def strip_timestamp(name):
-    return re.sub(r'(_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})\.parquet$', '.csv', name)
+    # Remove _YYYY_MM_DD_hh_mm_ss and the .parquet extension, then add .csv
+    cleaned = re.sub(r'_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}\.parquet$', '', name)
+    return cleaned + ".csv"
 
 def safe_str(val):
     if val is None:
