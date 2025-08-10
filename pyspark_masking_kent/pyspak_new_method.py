@@ -82,3 +82,19 @@ else:
         process_parquet(p)
 
 print("Done.")
+
+
+
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+parquet_file = "/lakehouse/default/Files/bronze/Temp/DataMasking/table_column_files/input/xxxxxx_2025_08_07_20_43_32.parquet"
+
+try:
+    df = spark.read.parquet(parquet_file)
+    df.show(5)
+    print("Read successful!")
+except Exception as e:
+    print(f"Failed reading parquet file: {e}")
+
