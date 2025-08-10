@@ -350,3 +350,15 @@ def process_csv_files():
 
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
+
+
+
+def list_csv_files(input_dir):
+    if MSUTILS:  # Microsoft Fabric/Synapse
+        return [f.path for f in MSUTILS.fs.ls(input_dir) if f.name.endswith(".csv")]
+    elif DBUTILS:  # Databricks
+        return [f.path for f in DBUTILS.fs.ls(input_dir) if f.name.endswith(".csv")]
+    else:  # Pure Spark (local or generic)
+        spark = SparkSession.builder.getOrCreate()
+        files_df = spark.read.format("binaryFile").load(input_dir + "/*.csv").select("path").collect()
+        return [row.path for row in files_df]
