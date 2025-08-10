@@ -12,12 +12,21 @@ print(f"Output directory: {OUTPUT_DIR}")
 spark = SparkSession.builder.getOrCreate()
 
 # Fabric utility for listing files/folders
-from mssparkutils import fs as mssfs
+import os
+import glob
 
-def strip_timestamp(name):
-    # Remove _YYYY_MM_DD_hh_mm_ss and the .parquet extension, then add .csv
-    cleaned = re.sub(r'_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}\.parquet$', '', name)
-    return cleaned + ".csv"
+def list_parquets(path):
+    # List all parquet files and folders inside path (local filesystem)
+    paths = []
+    # Get all .parquet files (case-insensitive)
+    files = glob.glob(os.path.join(path, '*.parquet'))
+    paths.extend(files)
+    # Also add folders (directories) if any - you may adjust this based on your dataset
+    for f in os.listdir(path):
+        full = os.path.join(path, f)
+        if os.path.isdir(full):
+            paths.append(full)
+    return paths
 
 def safe_str(val):
     if val is None:
