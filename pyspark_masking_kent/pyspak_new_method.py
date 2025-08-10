@@ -2,45 +2,27 @@ from pyspark.sql import SparkSession
 import os
 import re
 import fnmatch
+import mssparkutils  # Fabric file utilities
 
-# ----------------------------------
-# Helpers for environment detection
-# ----------------------------------
-def has_dbutils():
-    try:
-        dbutils  # noqa: F821
-        return True
-    except Exception:
-        return False
-
-def has_mssparkutils():
-    try:
-        import mssparkutils
-        return True
-    except ImportError:
-        return False
-
-# Initialize utility object
-MSUTILS = None
-DBUTILS = None
-if has_mssparkutils():
-    import mssparkutils
-    MSUTILS = mssparkutils
-elif has_dbutils():
-    DBUTILS = dbutils
-
-# ----------------------------------
+# -----------------------------
 # Config
-# ----------------------------------
+# -----------------------------
 INPUT_DIR = "/lakehouse/default/Files/exports"
 OUTPUT_DIR = "/lakehouse/default/Files/processed"
 FILE_PATTERN = "*.csv"
 OVERWRITE = True
 
-# ----------------------------------
-# Detect delimiter
-# ----------------------------------
+print(f"[INFO] Starting script")
+print(f"[INFO] INPUT_DIR = {INPUT_DIR}")
+print(f"[INFO] OUTPUT_DIR = {OUTPUT_DIR}")
+print(f"[INFO] FILE_PATTERN = {FILE_PATTERN}")
+print(f"[INFO] OVERWRITE = {OVERWRITE}")
+
+# -----------------------------
+# Helper: Detect delimiter
+# -----------------------------
 def detect_delimiter(file_path, spark):
+    print(f"[DEBUG] Detecting delimiter for: {file_path}")
     delimiters = [",", ";", "\t", "|", "^"]
     for delim in delimiters:
         try:
@@ -49,62 +31,57 @@ def detect_delimiter(file_path, spark):
                                 .option("mode", "DROPMALFORMED") \
                                 .csv(file_path)
             if df_test.columns and len(df_test.columns) > 1:
+                print(f"[DEBUG] Detected delimiter '{delim}' for {file_path}")
                 return delim
-        except Exception:
-            continue
+        except Exception as e:
+            print(f"[WARN] Delimiter '{delim}' failed for {file_path} -> {e}")
+    print(f"[WARN] Could not detect delimiter, defaulting to comma")
     return ","
 
-# ----------------------------------
-# Strip timestamp from filename
-# ----------------------------------
+# -----------------------------
+# Helper: Strip timestamp
+# -----------------------------
 def strip_timestamp(filename):
-    return re.sub(r"(_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})\.csv$", ".csv", filename)
+    cleaned = re.sub(r"(_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})\.csv$", ".csv", filename)
+    print(f"[DEBUG] Filename cleaned: {filename} -> {cleaned}")
+    return cleaned
 
-# ----------------------------------
-# List files based on environment
-# ----------------------------------
-def list_csv_files(input_dir):
-    if MSUTILS:  # Microsoft Fabric/Synapse
-        return [f.path for f in MSUTILS.fs.ls(input_dir) if f.name.endswith(".csv")]
-    elif DBUTILS:  # Databricks
-        return [f.path for f in DBUTILS.fs.ls(input_dir) if f.name.endswith(".csv")]
-    else:  # Pure Spark (local or generic)
-        spark = SparkSession.builder.getOrCreate()
-        files_df = spark.read.format("binaryFile").load(input_dir + "/*.csv").select("path").collect()
-        return [row.path for row in files_df]
-
-# ----------------------------------
-# Main processing
-# ----------------------------------
+# -----------------------------
+# Main
+# -----------------------------
 def process_csv_files():
     spark = SparkSession.builder.getOrCreate()
 
-    all_files = list_csv_files(INPUT_DIR)
+    print(f"[INFO] Listing CSV files in {INPUT_DIR}")
+    files = mssparkutils.fs.ls(INPUT_DIR)
+    all_files = [f.path for f in files if f.name.endswith(".csv")]
+
     if FILE_PATTERN != "*.csv":
         all_files = [f for f in all_files if fnmatch.fnmatch(os.path.basename(f), FILE_PATTERN)]
 
     if not all_files:
-        print(f"No matching CSV files found in {INPUT_DIR}")
+        print(f"[ERROR] No matching CSV files found in {INPUT_DIR}")
         return
 
-    # Create output folder if possible
-    if MSUTILS:
-        MSUTILS.fs.mkdirs(OUTPUT_DIR)
-    elif DBUTILS:
-        DBUTILS.fs.mkdirs(OUTPUT_DIR)
+    print(f"[INFO] Found {len(all_files)} CSV file(s) to process")
+    for f in all_files:
+        print(f"[INFO] Processing file: {f}")
 
-    for file_path in all_files:
         try:
-            delim = detect_delimiter(file_path, spark)
+            delim = detect_delimiter(f, spark)
 
+            print(f"[INFO] Reading CSV with delimiter '{delim}'")
             df = spark.read.option("header", True) \
                            .option("sep", delim) \
                            .option("mode", "DROPMALFORMED") \
                            .option("encoding", "UTF-8") \
-                           .csv(file_path)
+                           .csv(f)
 
             columns = df.columns
+            print(f"[DEBUG] Columns detected: {columns}")
+
             first_row = df.limit(1).collect()
+            print(f"[DEBUG] First row: {first_row}")
 
             if first_row:
                 row_data = first_row[0]
@@ -112,24 +89,28 @@ def process_csv_files():
             else:
                 sample_values = ["" for _ in columns]
 
+            print(f"[DEBUG] Sample values: {sample_values}")
+
             out_df = spark.createDataFrame(
                 [(col, sample, None) for col, sample in zip(columns, sample_values)],
                 ["TABLE_COLUMN_NAME", "SAMPLE_DATA", "IS_MASKED"]
             )
 
-            original_name = os.path.basename(file_path)
+            original_name = os.path.basename(f)
             cleaned_name = strip_timestamp(original_name)
             output_path = os.path.join(OUTPUT_DIR, cleaned_name)
 
+            print(f"[INFO] Writing output to: {output_path}")
             mode = "overwrite" if OVERWRITE else "error"
             out_df.coalesce(1).write.option("header", True).mode(mode).csv(output_path)
 
-            print(f"Wrote: {output_path}")
+            print(f"[SUCCESS] Wrote: {output_path}")
 
         except Exception as e:
-            print(f"Error processing {file_path}: {e}")
+            print(f"[ERROR] Failed processing {f} -> {e}")
 
-# ----------------------------------
+# -----------------------------
 # Run
-# ----------------------------------
+# -----------------------------
 process_csv_files()
+print(f"[INFO] Script finished")
