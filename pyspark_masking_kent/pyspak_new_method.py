@@ -74,6 +74,8 @@ def process_csv_files():
                            .option("sep", delim) \
                            .option("mode", "DROPMALFORMED") \
                            .option("encoding", "UTF-8") \
+                           .option("ignoreLeadingWhiteSpace", True) \
+                           .option("ignoreTrailingWhiteSpace", True) \
                            .csv(f)
 
             columns = df.columns
