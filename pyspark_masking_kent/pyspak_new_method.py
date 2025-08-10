@@ -98,3 +98,9 @@ try:
 except Exception as e:
     print(f"Failed reading parquet file: {e}")
 
+
+
+files_df = spark.read.format("binaryFile").load("/lakehouse/default/Files/bronze/Temp/DataMasking/table_column_files/input/*.parquet")
+files_df.select("path", "length").show(truncate=False)
+
+
