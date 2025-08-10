@@ -198,3 +198,109 @@ else:
             process_one(p)
         except Exception as e:
             print(f"ERROR processing {p}: {e}")
+
+
+
+
+
+from pyspark.sql import SparkSession
+import argparse
+import os
+import re
+
+# -----------------------------
+# Helper: Detect delimiter
+# -----------------------------
+def detect_delimiter(file_path, spark):
+    # Try common delimiters: comma, semicolon, tab, pipe, caret
+    delimiters = [",", ";", "\t", "|", "^"]
+    for delim in delimiters:
+        try:
+            # Read first line with this delimiter
+            df_test = spark.read.option("header", True) \
+                                .option("sep", delim) \
+                                .option("mode", "DROPMALFORMED") \
+                                .csv(file_path)
+            if df_test.columns and len(df_test.columns) > 1:
+                return delim
+        except Exception:
+            continue
+    return ","  # default
+
+# -----------------------------
+# Helper: Strip timestamp suffix
+# -----------------------------
+def strip_timestamp(filename):
+    # Remove final _YYYY_MM_DD_HH_MM_SS before extension
+    return re.sub(r"(_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})\.csv$", ".csv", filename)
+
+# -----------------------------
+# Main processing
+# -----------------------------
+def process_csv_files(input_dir, output_dir, pattern="*.csv", overwrite=False):
+    spark = SparkSession.builder.getOrCreate()
+
+    # List all matching files
+    all_files = [f.path for f in dbutils.fs.ls(input_dir) if f.name.endswith(".csv")]
+    if pattern != "*.csv":
+        import fnmatch
+        all_files = [f for f in all_files if fnmatch.fnmatch(os.path.basename(f), pattern)]
+
+    if not all_files:
+        print(f"No matching CSV files found in {input_dir}")
+        return
+
+    for file_path in all_files:
+        try:
+            delim = detect_delimiter(file_path, spark)
+
+            # Read CSV with detected delimiter, tolerant mode
+            df = spark.read.option("header", True) \
+                           .option("sep", delim) \
+                           .option("mode", "DROPMALFORMED") \
+                           .option("encoding", "UTF-8") \
+                           .csv(file_path)
+
+            columns = df.columns
+            first_row = df.limit(1).collect()
+
+            sample_values = []
+            if first_row:
+                row_data = first_row[0]
+                sample_values = ["" if row_data[c] is None else str(row_data[c]) for c in columns]
+            else:
+                sample_values = ["" for _ in columns]
+
+            # Create output DataFrame
+            out_df = spark.createDataFrame(
+                [(col, sample, None) for col, sample in zip(columns, sample_values)],
+                ["TABLE_COLUMN_NAME", "SAMPLE_DATA", "IS_MASKED"]
+            )
+
+            # Prepare output path & name
+            original_name = os.path.basename(file_path)
+            cleaned_name = strip_timestamp(original_name)
+            output_path = os.path.join(output_dir, cleaned_name)
+
+            # Write as CSV (overwrite if set)
+            mode = "overwrite" if overwrite else "error"
+            out_df.coalesce(1).write.option("header", True).mode(mode).csv(output_path)
+
+            print(f"Wrote: {output_path}")
+
+        except Exception as e:
+            print(f"Error processing {file_path}: {e}")
+
+# -----------------------------
+# CLI entry
+# -----------------------------
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Process CSVs from Lakehouse")
+    parser.add_argument("--input-dir", required=True, help="Input folder path")
+    parser.add_argument("--output-dir", required=True, help="Output folder path")
+    parser.add_argument("--pattern", default="*.csv", help="File pattern (default *.csv)")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing output")
+    args = parser.parse_args()
+
+    process_csv_files(args.input_dir, args.output_dir, args.pattern, args.overwrite)
+
