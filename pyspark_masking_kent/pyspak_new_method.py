@@ -1,117 +1,73 @@
 from pyspark.sql import SparkSession
-import os
 import re
-import fnmatch
 
-# -----------------------------
-# Config
-# -----------------------------
+# Adjust these paths
 INPUT_DIR = "/lakehouse/default/Files/exports"
 OUTPUT_DIR = "/lakehouse/default/Files/processed"
-FILE_PATTERN = "*.csv"
 OVERWRITE = True
 
-print(f"[INFO] Starting script")
-print(f"[INFO] INPUT_DIR = {INPUT_DIR}")
-print(f"[INFO] OUTPUT_DIR = {OUTPUT_DIR}")
-print(f"[INFO] FILE_PATTERN = {FILE_PATTERN}")
-print(f"[INFO] OVERWRITE = {OVERWRITE}")
+print(f"Input directory: {INPUT_DIR}")
+print(f"Output directory: {OUTPUT_DIR}")
 
-# -----------------------------
-# Helper: Detect delimiter
-# -----------------------------
-def detect_delimiter(file_path, spark):
-    print(f"[DEBUG] Detecting delimiter for: {file_path}")
-    delimiters = [",", ";", "\t", "|", "^"]
-    for delim in delimiters:
-        try:
-            df_test = spark.read.option("header", True) \
-                                .option("sep", delim) \
-                                .option("mode", "DROPMALFORMED") \
-                                .csv(file_path)
-            if df_test.columns and len(df_test.columns) > 1:
-                print(f"[DEBUG] Detected delimiter '{delim}' for {file_path}")
-                return delim
-        except Exception as e:
-            print(f"[WARN] Delimiter '{delim}' failed for {file_path} -> {e}")
-    print(f"[WARN] Could not detect delimiter, defaulting to comma")
-    return ","
+spark = SparkSession.builder.getOrCreate()
 
-# -----------------------------
-# Helper: Strip timestamp
-# -----------------------------
-def strip_timestamp(filename):
-    cleaned = re.sub(r"(_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})\.csv$", ".csv", filename)
-    print(f"[DEBUG] Filename cleaned: {filename} -> {cleaned}")
-    return cleaned
+# Fabric utility for listing files/folders
+from mssparkutils import fs as mssfs
 
-# -----------------------------
-# Main
-# -----------------------------
-def process_csv_files():
-    spark = SparkSession.builder.getOrCreate()
+def strip_timestamp(name):
+    return re.sub(r'(_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})\.parquet$', '.csv', name)
 
-    print(f"[INFO] Listing CSV files in {INPUT_DIR} using binaryFile")
-    files_df = spark.read.format("binaryFile").load(INPUT_DIR + "/*.csv").select("path").collect()
-    all_files = [row.path for row in files_df]
+def safe_str(val):
+    if val is None:
+        return ""
+    return str(val)
 
-    if FILE_PATTERN != "*.csv":
-        all_files = [f for f in all_files if fnmatch.fnmatch(os.path.basename(f), FILE_PATTERN)]
+def list_parquets(path):
+    items = mssfs.ls(path)
+    paths = []
+    for item in items:
+        # if file ends with .parquet or folder (isFile == False)
+        if (item['isFile'] and item['name'].lower().endswith('.parquet')) or (not item['isFile']):
+            paths.append(item['path'])
+    return paths
 
-    if not all_files:
-        print(f"[ERROR] No matching CSV files found in {INPUT_DIR}")
+def process_parquet(path):
+    print(f"Processing: {path}")
+    try:
+        df = spark.read.parquet(path)
+    except Exception as e:
+        print(f"Error reading parquet {path}: {e}")
         return
 
-    print(f"[INFO] Found {len(all_files)} CSV file(s) to process")
-    for f in all_files:
-        print(f"[INFO] Processing file: {f}")
+    cols = df.columns
+    first_row = df.limit(1).collect()
+    if first_row:
+        first_row = first_row[0]
+    else:
+        first_row = None
 
-        try:
-            delim = detect_delimiter(f, spark)
+    data = []
+    for c in cols:
+        sample = safe_str(first_row[c]) if first_row else ""
+        data.append((c, sample, None))
 
-            print(f"[INFO] Reading CSV with delimiter '{delim}'")
-            df = spark.read.option("header", True) \
-                           .option("sep", delim) \
-                           .option("mode", "DROPMALFORMED") \
-                           .option("encoding", "UTF-8") \
-                           .option("ignoreLeadingWhiteSpace", True) \
-                           .option("ignoreTrailingWhiteSpace", True) \
-                           .csv(f)
+    out_df = spark.createDataFrame(data, ["TABLE_COLUMN_NAME", "SAMPLE_DATA", "IS_MASKED"])
 
-            columns = df.columns
-            print(f"[DEBUG] Columns detected: {columns}")
+    import os
+    base = os.path.basename(path.rstrip('/'))
+    out_name = strip_timestamp(base)
+    out_path = OUTPUT_DIR.rstrip('/') + '/' + out_name
 
-            first_row = df.limit(1).collect()
-            print(f"[DEBUG] First row: {first_row}")
+    mode = "overwrite" if OVERWRITE else "error"
+    out_df.coalesce(1).write.option("header", True).mode(mode).csv(out_path)
 
-            if first_row:
-                row_data = first_row[0]
-                sample_values = ["" if row_data[c] is None else str(row_data[c]) for c in columns]
-            else:
-                sample_values = ["" for _ in columns]
+    print(f"Wrote CSV to: {out_path}")
 
-            print(f"[DEBUG] Sample values: {sample_values}")
+parquet_datasets = list_parquets(INPUT_DIR)
+if not parquet_datasets:
+    print("No parquet files or folders found.")
+else:
+    for p in parquet_datasets:
+        process_parquet(p)
 
-            out_df = spark.createDataFrame(
-                [(col, sample, None) for col, sample in zip(columns, sample_values)],
-                ["TABLE_COLUMN_NAME", "SAMPLE_DATA", "IS_MASKED"]
-            )
-
-            original_name = os.path.basename(f)
-            cleaned_name = strip_timestamp(original_name)
-            output_path = os.path.join(OUTPUT_DIR, cleaned_name)
-
-            print(f"[INFO] Writing output to: {output_path}")
-            mode = "overwrite" if OVERWRITE else "error"
-            out_df.coalesce(1).write.option("header", True).mode(mode).csv(output_path)
-
-            print(f"[SUCCESS] Wrote: {output_path}")
-
-        except Exception as e:
-            print(f"[ERROR] Failed processing {f} -> {e}")
-
-# -----------------------------
-# Run
-# -----------------------------
-process_csv_files()
-print(f"[INFO] Script finished")
+print("Done.")
