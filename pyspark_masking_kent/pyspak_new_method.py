@@ -298,4 +298,55 @@ def process_csv_files():
 # -----------------------------
 process_csv_files()
 
+def process_csv_files():
+    spark = SparkSession.builder.getOrCreate()
 
+    all_files = list_csv_files(INPUT_DIR)
+    if FILE_PATTERN != "*.csv":
+        all_files = [f for f in all_files if fnmatch.fnmatch(os.path.basename(f), FILE_PATTERN)]
+
+    if not all_files:
+        print(f"No matching CSV files found in {INPUT_DIR}")
+        return
+
+    # Create output folder if possible
+    if MSUTILS:
+        MSUTILS.fs.mkdirs(OUTPUT_DIR)
+    elif DBUTILS:
+        DBUTILS.fs.mkdirs(OUTPUT_DIR)
+
+    for file_path in all_files:
+        try:
+            delim = detect_delimiter(file_path, spark)
+
+            df = spark.read.option("header", True) \
+                           .option("sep", delim) \
+                           .option("mode", "DROPMALFORMED") \
+                           .option("encoding", "UTF-8") \
+                           .csv(file_path)
+
+            columns = df.columns
+            first_row = df.limit(1).collect()
+
+            if first_row:
+                row_data = first_row[0]
+                sample_values = ["" if row_data[c] is None else str(row_data[c]) for c in columns]
+            else:
+                sample_values = ["" for _ in columns]
+
+            out_df = spark.createDataFrame(
+                [(col, sample, None) for col, sample in zip(columns, sample_values)],
+                ["TABLE_COLUMN_NAME", "SAMPLE_DATA", "IS_MASKED"]
+            )
+
+            original_name = os.path.basename(file_path)
+            cleaned_name = strip_timestamp(original_name)
+            output_path = os.path.join(OUTPUT_DIR, cleaned_name)
+
+            mode = "overwrite" if OVERWRITE else "error"
+            out_df.coalesce(1).write.option("header", True).mode(mode).csv(output_path)
+
+            print(f"Wrote: {output_path}")
+
+        except Exception as e:
+            print(f"Error processing {file_path}: {e}")
