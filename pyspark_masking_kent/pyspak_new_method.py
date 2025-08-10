@@ -2,7 +2,6 @@ from pyspark.sql import SparkSession
 import os
 import re
 import fnmatch
-import mssparkutils  # Fabric file utilities
 
 # -----------------------------
 # Config
@@ -52,9 +51,9 @@ def strip_timestamp(filename):
 def process_csv_files():
     spark = SparkSession.builder.getOrCreate()
 
-    print(f"[INFO] Listing CSV files in {INPUT_DIR}")
-    files = mssparkutils.fs.ls(INPUT_DIR)
-    all_files = [f.path for f in files if f.name.endswith(".csv")]
+    print(f"[INFO] Listing CSV files in {INPUT_DIR} using binaryFile")
+    files_df = spark.read.format("binaryFile").load(INPUT_DIR + "/*.csv").select("path").collect()
+    all_files = [row.path for row in files_df]
 
     if FILE_PATTERN != "*.csv":
         all_files = [f for f in all_files if fnmatch.fnmatch(os.path.basename(f), FILE_PATTERN)]
