@@ -75,3 +75,23 @@ else:
         process_parquet(p)
 
 print("Done.")
+
+
+
+from pyspark.sql import SparkSession
+
+# Create or get SparkSession
+spark = SparkSession.builder.getOrCreate()
+
+# Replace with the actual path to one of the parquet files you are trying to read
+parquet_file_path = "/lakehouse/default/Files/exports/your_file_name.parquet"
+
+print(f"Attempting to read: {parquet_file_path}")
+
+try:
+    df_test = spark.read.parquet(parquet_file_path)
+    print("Successfully read the parquet file.")
+    df_test.printSchema()
+    df_test.show(5)
+except Exception as e:
+    print(f"Error reading parquet file: {e}")
