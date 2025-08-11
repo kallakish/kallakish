@@ -1,97 +1,100 @@
-from pyspark.sql import SparkSession
 import re
-import os
-import glob
+from pyspark.sql import SparkSession
+from notebookutils import mssparkutils  # Fabric equivalent of dbutils
 
-# Adjust these paths
-INPUT_DIR = "/lakehouse/default/Files/exports"
-OUTPUT_DIR = "/lakehouse/default/Files/processed"
+# -----------------------------
+# Config - absolute paths
+# -----------------------------
+INPUT_DIR = "lakehouse:/Files/bronze/Temp/DataMasking/table_column_files/input"
+OUTPUT_DIR = "lakehouse:/Files/bronze/Temp/DataMasking/table_column_files/output"
 OVERWRITE = True
 
-print(f"Input directory: {INPUT_DIR}")
-print(f"Output directory: {OUTPUT_DIR}")
+print(f"[INFO] Starting script")
+print(f"[INFO] INPUT_DIR = {INPUT_DIR}")
+print(f"[INFO] OUTPUT_DIR = {OUTPUT_DIR}")
+print(f"[INFO] OVERWRITE = {OVERWRITE}")
 
-spark = SparkSession.builder.getOrCreate()
-
+# -----------------------------
+# Helper: Strip timestamp from filename
+# -----------------------------
 def strip_timestamp(name):
-    # Remove _YYYY_MM_DD_hh_mm_ss and the .parquet extension, then add .csv
-    cleaned = re.sub(r'_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}\.parquet$', '', name)
-    return cleaned + ".csv"
+    # Remove _YYYY_MM_DD_HH_mm_ss from end and change extension to .csv
+    cleaned = re.sub(r'(_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})\.parquet$', '.csv', name)
+    print(f"[DEBUG] Filename cleaned: {name} -> {cleaned}")
+    return cleaned
 
-def safe_str(val):
-    if val is None:
-        return ""
-    return str(val)
+# -----------------------------
+# Main processing function
+# -----------------------------
+def process_parquet_files():
+    spark = SparkSession.builder.getOrCreate()
 
-def list_parquets(path):
-    """Lists all parquet files recursively within a given path using os.walk."""
-    parquet_files = []
-    # Use os.walk to traverse directories
-    for dirpath, dirnames, filenames in os.walk(path):
-        for f in filenames:
-            if f.lower().endswith('.parquet'):
-                parquet_files.append(os.path.join(dirpath, f))
-    return parquet_files
-
-def process_parquet(path):
-    print(f"Processing: {path}")
+    print(f"[INFO] Listing Parquet files in {INPUT_DIR}")
     try:
-        df = spark.read.parquet(path)
+        files_info = mssparkutils.fs.ls(INPUT_DIR)
+        parquet_files = [f for f in files_info if f.name.endswith(".parquet")]
     except Exception as e:
-        print(f"Error reading parquet {path}: {e}")
+        print(f"[ERROR] Could not list files in {INPUT_DIR}: {e}")
         return
 
-    cols = df.columns
-    first_row = df.limit(1).collect()
-    if first_row:
-        first_row = first_row[0]
-    else:
-        first_row = None
+    if not parquet_files:
+        print(f"[WARN] No Parquet files found in {INPUT_DIR}")
+        return
 
-    data = []
-    for c in cols:
-        sample = safe_str(first_row[c]) if first_row else ""
-        data.append((c, sample, None))
+    print(f"[INFO] Found {len(parquet_files)} parquet file(s)")
 
-    out_df = spark.createDataFrame(data, ["TABLE_COLUMN_NAME", "SAMPLE_DATA", "IS_MASKED"])
+    for file_info in parquet_files:
+        file_path = file_info.path
+        file_name = file_info.name
 
-    import os
-    base = os.path.basename(path.rstrip('/'))
-    out_name = strip_timestamp(base)
-    out_path = OUTPUT_DIR.rstrip('/') + '/' + out_name
+        print(f"[INFO] Processing file: {file_path}")
 
-    mode = "overwrite" if OVERWRITE else "error"
-    # Spark will create a directory for CSV output, not a single file by default
-    out_df.coalesce(1).write.option("header", True).mode(mode).csv(out_path)
+        try:
+            # Read parquet file (dataset or single file)
+            df = spark.read.parquet(file_path)
 
-    print(f"Wrote CSV to directory: {out_path}") # Indicate it's a directory
+            columns = df.schema.names
+            print(f"[DEBUG] Columns detected: {columns}")
 
-parquet_datasets = list_parquets(INPUT_DIR)
-if not parquet_datasets:
-    print("No parquet files or folders found in the input directory.")
-else:
-    print(f"Found {len(parquet_datasets)} parquet files.")
-    for p in parquet_datasets:
-        process_parquet(p)
+            first_row = df.limit(1).collect()
+            if first_row:
+                row = first_row[0]
+                sample_values = []
+                for col in columns:
+                    val = row[col]
+                    if val is None:
+                        sample_values.append("")
+                    else:
+                        # Convert complex types to string
+                        sample_values.append(str(val))
+            else:
+                sample_values = [""] * len(columns)
 
-print("Done.")
+            print(f"[DEBUG] Sample values: {sample_values}")
 
+            # Create output DataFrame with required columns
+            out_rows = [(col, sample, None) for col, sample in zip(columns, sample_values)]
+            out_df = spark.createDataFrame(out_rows, ["TABLE_COLUMN_NAME", "SAMPLE_DATA", "IS_MASKED"])
 
+            # Clean filename for output
+            cleaned_name = strip_timestamp(file_name)
 
-from pyspark.sql import SparkSession
+            output_path = f"{OUTPUT_DIR}/{cleaned_name}"
 
-# Create or get SparkSession
-spark = SparkSession.builder.getOrCreate()
+            print(f"[INFO] Writing output CSV to: {output_path}")
 
-# Replace with the actual path to one of the parquet files you are trying to read
-parquet_file_path = "/lakehouse/default/Files/exports/your_file_name.parquet"
+            mode = "overwrite" if OVERWRITE else "error"
 
-print(f"Attempting to read: {parquet_file_path}")
+            # Write as single CSV file with header
+            out_df.coalesce(1).write.option("header", True).mode(mode).csv(output_path)
 
-try:
-    df_test = spark.read.parquet(parquet_file_path)
-    print("Successfully read the parquet file.")
-    df_test.printSchema()
-    df_test.show(5)
-except Exception as e:
-    print(f"Error reading parquet file: {e}")
+            print(f"[SUCCESS] Written output for {file_name} at {output_path}")
+
+        except Exception as e:
+            print(f"[ERROR] Failed processing {file_path}: {e}")
+
+# -----------------------------
+# Run the script
+# -----------------------------
+process_parquet_files()
+print("[INFO] Script finished")
