@@ -1,0 +1,41 @@
+🔹 10-Step CICD Pipeline Flow
+
+1. Code Development
+
+Developers create feature branches, implement changes, commit, and push code.
+
+2. Merge & Build
+
+Code is peer-reviewed, merged into main/master, and the pipeline prepares build artifacts (packages, Fabric items, SQL scripts, etc.).
+
+3. Deploy to Dev
+
+Build artifacts are automatically deployed to the Dev environment.
+
+4. Validate in Dev
+
+Developers perform unit tests / smoke tests in Dev to ensure functionality.
+
+5. Deploy to Test
+
+If Dev validation passes, code is promoted and deployed to the Test environment.
+
+6. Verify in Test
+
+The test team (or automated regression tests) validate the solution against requirements.
+
+7. Deploy to UAT
+
+Once Test verification succeeds, code is promoted and deployed to the UAT environment.
+
+8. Validate in UAT
+
+Business users (UAT team) validate functionality and sign off.
+
+9. Deploy to Live (Prod)
+
+After UAT acceptance, the release is promoted and deployed to the Live environment.
+
+10. Post-Deployment Verification
+
+Smoke tests, monitoring, and validation are performed in Live to confirm stability.
