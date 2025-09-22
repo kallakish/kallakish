@@ -225,3 +225,58 @@ foreach ($sub in $subs) {
 # Print results in table
 $results | Format-Table -AutoSize
 
+
+
+
+-----
+
+# Requires Az PowerShell module
+Connect-AzAccount
+
+# Collect results
+$results = @()
+
+function Check-NSGAlert {
+    param(
+        [string]$subscriptionId,
+        [string]$subscriptionName
+    )
+
+    Set-AzContext -Subscription $subscriptionId -ErrorAction SilentlyContinue | Out-Null
+
+    # Get all Activity Log Alerts
+    $alerts = Get-AzActivityLogAlert -ErrorAction SilentlyContinue
+
+    # Look for NSG-related alerts (by operationName or resourceType)
+    $nsgAlerts = @()
+    foreach ($a in $alerts) {
+        foreach ($cond in $a.Condition.AllOf) {
+            if (
+                ($cond.Field -eq "resourceType" -and $cond.Equal -eq "Microsoft.Network/networkSecurityGroups") -or
+                ($cond.Field -eq "operationName" -and $cond.Equal -match "NetworkSecurityGroup")
+            ) {
+                $nsgAlerts += $a
+            }
+        }
+    }
+
+    # Add to results
+    $results += [PSCustomObject]@{
+        SubscriptionName = $subscriptionName
+        SubscriptionId   = $subscriptionId
+        HasNSGAlert      = if ($nsgAlerts) { "Yes" } else { "No" }
+        AlertCount       = if ($nsgAlerts) { $nsgAlerts.Count } else { 0 }
+        AlertNames       = if ($nsgAlerts) { ($nsgAlerts.Name -join ", ") } else { "" }
+    }
+}
+
+# Loop through all subscriptions
+$subs = Get-AzSubscription
+foreach ($sub in $subs) {
+    Check-NSGAlert -subscriptionId $sub.Id -subscriptionName $sub.Name
+}
+
+# Print results in table
+$results | Format-Table -AutoSize
+
+
