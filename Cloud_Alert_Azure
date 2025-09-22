@@ -184,4 +184,44 @@ foreach ($sub in $subs) {
     Check-NSGAlert -subscriptionId $sub.Id -subscriptionName $sub.Name
 }
 
+# Requires Az PowerShell module
+Connect-AzAccount
+
+# Collect results
+$results = @()
+
+function Check-NSGAlert {
+    param(
+        [string]$subscriptionId,
+        [string]$subscriptionName
+    )
+
+    Set-AzContext -Subscription $subscriptionId -ErrorAction SilentlyContinue | Out-Null
+
+    # Get all Activity Log Alerts
+    $alerts = Get-AzActivityLogAlert -ErrorAction SilentlyContinue
+
+    # Filter for NSG-related alerts
+    $nsgAlerts = $alerts | Where-Object {
+        $_.Condition.AllOf.Field -contains "resourceType" -and
+        $_.Condition.AllOf.Value -contains "Microsoft.Network/networkSecurityGroups"
+    }
+
+    # Add to results
+    $results += [PSCustomObject]@{
+        SubscriptionName = $subscriptionName
+        SubscriptionId   = $subscriptionId
+        HasNSGAlert      = if ($nsgAlerts) { "Yes" } else { "No" }
+        AlertCount       = if ($nsgAlerts) { $nsgAlerts.Count } else { 0 }
+    }
+}
+
+# Loop through all subscriptions
+$subs = Get-AzSubscription
+foreach ($sub in $subs) {
+    Check-NSGAlert -subscriptionId $sub.Id -subscriptionName $sub.Name
+}
+
+# Print results in table
+$results | Format-Table -AutoSize
 
