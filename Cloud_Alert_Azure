@@ -146,3 +146,42 @@ foreach ($sub in $subs) {
 }
 
 
+
+
+# Requires Az PowerShell module
+# Connect to Azure
+Connect-AzAccount
+
+# Function to check if any NSG alert exists in a subscription
+function Check-NSGAlert {
+    param(
+        [string]$subscriptionId,
+        [string]$subscriptionName
+    )
+    Set-AzContext -Subscription $subscriptionId
+
+    # Get all Activity Log Alerts in the subscription
+    $alerts = Get-AzActivityLogAlert -ErrorAction SilentlyContinue
+
+    # Filter for NSG-related alerts
+    $nsgAlerts = $alerts | Where-Object {
+        $_.Condition.AllOf.Field -contains "resourceType" -and
+        $_.Condition.AllOf.Value -contains "Microsoft.Network/networkSecurityGroups"
+    }
+
+    if ($nsgAlerts) {
+        Write-Host "✅ Subscription $subscriptionName ($subscriptionId) has at least one NSG alert." -ForegroundColor Green
+    }
+    else {
+        Write-Host "❌ Subscription $subscriptionName ($subscriptionId) has NO NSG alerts." -ForegroundColor Red
+    }
+}
+
+# Process all subscriptions
+$subs = Get-AzSubscription
+foreach ($sub in $subs) {
+    Write-Host "`n--- Checking subscription $($sub.Name) ($($sub.Id)) ---"
+    Check-NSGAlert -subscriptionId $sub.Id -subscriptionName $sub.Name
+}
+
+
