@@ -41,3 +41,108 @@ resourcecontainers
 | where hasNSGAlert == "No"
 | project subscriptionId, subscriptionName, hasNSGAlert
 
+
+
+# Requires Az PowerShell module
+# Connect to Azure
+Connect-AzAccount
+
+# Alert parameters (to match existing alerts)
+$alertRuleName  = "NSG-Change-Alert"
+$alertRuleRg    = "Monitoring-Alerts-RG"   # Adjust if you placed alerts elsewhere
+
+# Function to check if alert exists
+function Check-NSGAlert {
+    param(
+        [string]$subscriptionId
+    )
+    Set-AzContext -Subscription $subscriptionId
+
+    # Look for an Activity Log Alert targeting NSGs
+    $alert = Get-AzActivityLogAlert -ErrorAction SilentlyContinue | Where-Object {
+        $_.Name -eq $alertRuleName -and $_.ResourceGroupName -eq $alertRuleRg
+    }
+
+    if ($alert) {
+        Write-Host "✅ Subscription $subscriptionId has NSG alert: $($alert.Name)" -ForegroundColor Green
+    }
+    else {
+        Write-Host "❌ Subscription $subscriptionId does NOT have NSG alert." -ForegroundColor Red
+    }
+}
+
+# Process all subscriptions
+$subs = Get-AzSubscription
+foreach ($sub in $subs) {
+    Write-Host "`n--- Checking subscription $($sub.Name) ($($sub.Id)) ---"
+    Check-NSGAlert -subscriptionId $sub.Id
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+=====================
+
+# Requires Az PowerShell module
+# Connect to Azure
+Connect-AzAccount
+
+# Define parameters
+$actionGroupId  = "/subscriptions/<SUB-ID>/resourceGroups/<RG-NAME>/providers/microsoft.insights/actionGroups/<ACTION-GROUP-NAME>"
+$alertRuleName  = "NSG-Change-Alert"
+$alertRuleRg    = "Monitoring-Alerts-RG"   # Must exist in each subscription
+
+# Function to check and create NSG alert if missing
+function Ensure-NSGAlert {
+    param(
+        [string]$subscriptionId,
+        [string]$subscriptionName
+    )
+    Set-AzContext -Subscription $subscriptionId
+
+    # Check for existing alert
+    $alert = Get-AzActivityLogAlert -ErrorAction SilentlyContinue | Where-Object {
+        $_.Name -eq $alertRuleName -and $_.ResourceGroupName -eq $alertRuleRg
+    }
+
+    if ($alert) {
+        Write-Host "✅ Subscription $subscriptionName ($subscriptionId) already has NSG alert: $($alert.Name)" -ForegroundColor Green
+    }
+    else {
+        Write-Host "❌ Subscription $subscriptionName ($subscriptionId) has NO NSG alert. Creating one..." -ForegroundColor Yellow
+
+        $conditions = @(
+            New-AzActivityLogAlertCondition -Field "category" -Equal "Administrative",
+            New-AzActivityLogAlertCondition -Field "resourceType" -Equal "Microsoft.Network/networkSecurityGroups"
+        )
+
+        New-AzActivityLogAlert `
+            -Name $alertRuleName `
+            -ResourceGroupName $alertRuleRg `
+            -Location "Global" `
+            -Scope "/subscriptions/$subscriptionId" `
+            -ActionGroupId $actionGroupId `
+            -Condition $conditions `
+            -Enabled $true
+
+        Write-Host "🚀 Created NSG alert in subscription $subscriptionName ($subscriptionId)." -ForegroundColor Cyan
+    }
+}
+
+# Process all subscriptions
+$subs = Get-AzSubscription
+foreach ($sub in $subs) {
+    Write-Host "`n--- Checking subscription $($sub.Name) ($($sub.Id)) ---"
+    Ensure-NSGAlert -subscriptionId $sub.Id -subscriptionName $sub.Name
+}
+
+
