@@ -17,3 +17,27 @@ resources
 | extend hasNSGAlert = iif(isnotempty(subscriptionId1), "Yes", "No")
 | where hasNSGAlert == "No"
 | project subscriptionId, subscriptionName, hasNSGAlert
+
+
+
+
+// Step 1: Get all Activity Log Alerts related to NSGs
+let NSGAlerts = resources
+| where type == "microsoft.insights/activitylogalerts"
+| extend scopes = properties.scopes, conditions = properties.condition.allOf
+| mv-expand scopes
+| extend subscriptionId = tostring(split(scopes, "/")[2])
+| where conditions contains "Microsoft.Network/networkSecurityGroups"
+| distinct subscriptionId;
+
+// Step 2: Get all subscriptions
+resourcecontainers
+| where type == "microsoft.resources/subscriptions"
+| project subscriptionId = id, subscriptionName = name
+| join kind=leftouter (
+    NSGAlerts
+) on subscriptionId
+| extend hasNSGAlert = iif(isnotempty(subscriptionId1), "Yes", "No")
+| where hasNSGAlert == "No"
+| project subscriptionId, subscriptionName, hasNSGAlert
+
