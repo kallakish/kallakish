@@ -131,3 +131,26 @@
     }
   }
 }
+
+
+
+{
+  "properties": {
+    "displayName": "Assignment - Ensure NSG Delete Alert",
+    "description": "Assigns the initiative that ensures an Activity Log alert exists for NSG delete operations.",
+    "policyDefinitionId": "/subscriptions/<subId>/providers/Microsoft.Authorization/policySetDefinitions/<initiativeName>",
+    "scope": "/subscriptions/<subId>",
+    "parameters": {
+      "actionGroupResourceId": {
+        "value": "/subscriptions/<subId>/resourceGroups/<rgName>/providers/microsoft.insights/actionGroups/<actionGroupName>"
+      },
+      "alertName": {
+        "value": "NSG-Delete-Alert"
+      },
+      "location": {
+        "value": "global"
+      }
+    },
+    "enforcementMode": "Default"
+  }
+}
