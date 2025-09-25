@@ -1,0 +1,133 @@
+{
+  "properties": {
+    "displayName": "Deploy Activity Log Alert for NSG Delete Operations",
+    "policyType": "Custom",
+    "mode": "All",
+    "description": "Ensures that an Activity Log alert exists for NSG deletions. If no alert exists, one will be deployed.",
+    "metadata": {
+      "version": "1.0.0",
+      "category": "Monitoring"
+    },
+    "parameters": {
+      "actionGroupResourceId": {
+        "type": "String",
+        "metadata": {
+          "displayName": "Action Group Resource ID",
+          "description": "Resource ID of the Action Group that will be notified when an NSG is deleted."
+        }
+      },
+      "alertName": {
+        "type": "String",
+        "defaultValue": "NSG-Delete-Alert",
+        "metadata": {
+          "displayName": "Alert Rule Name",
+          "description": "Name of the Activity Log Alert to create."
+        }
+      },
+      "location": {
+        "type": "String",
+        "defaultValue": "global",
+        "metadata": {
+          "displayName": "Location",
+          "description": "Location for the alert resource (always 'global' for activity log alerts)."
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.Resources/subscriptions"
+          }
+        ]
+      },
+      "then": {
+        "effect": "deployIfNotExists",
+        "details": {
+          "type": "Microsoft.Insights/activityLogAlerts",
+          "roleDefinitionIds": [
+            "/providers/microsoft.authorization/roleDefinitions/fd9e5b9e-7f02-46b4-8f6d-6f3a72bfa2d7" 
+          ],
+          "existenceCondition": {
+            "allOf": [
+              {
+                "field": "Microsoft.Insights/activityLogAlerts/condition.allOf[*].equals",
+                "equals": "Microsoft.Network/networkSecurityGroups/delete"
+              }
+            ]
+          },
+          "deployment": {
+            "properties": {
+              "mode": "incremental",
+              "template": {
+                "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                "contentVersion": "1.0.0.0",
+                "parameters": {
+                  "alertName": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  },
+                  "actionGroupResourceId": {
+                    "type": "string"
+                  }
+                },
+                "resources": [
+                  {
+                    "type": "Microsoft.Insights/activityLogAlerts",
+                    "apiVersion": "2017-04-01",
+                    "name": "[parameters('alertName')]",
+                    "location": "[parameters('location')]",
+                    "properties": {
+                      "enabled": true,
+                      "scopes": [
+                        "[subscription().id]"
+                      ],
+                      "condition": {
+                        "allOf": [
+                          {
+                            "field": "category",
+                            "equals": "Administrative"
+                          },
+                          {
+                            "field": "operationName",
+                            "equals": "Microsoft.Network/networkSecurityGroups/delete"
+                          },
+                          {
+                            "field": "status",
+                            "equals": "Succeeded"
+                          }
+                        ]
+                      },
+                      "actions": {
+                        "actionGroups": [
+                          {
+                            "actionGroupId": "[parameters('actionGroupResourceId')]"
+                          }
+                        ]
+                      },
+                      "description": "Alert when a Network Security Group is deleted"
+                    }
+                  }
+                ]
+              },
+              "parameters": {
+                "alertName": {
+                  "value": "[parameters('alertName')]"
+                },
+                "location": {
+                  "value": "[parameters('location')]"
+                },
+                "actionGroupResourceId": {
+                  "value": "[parameters('actionGroupResourceId')]"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
