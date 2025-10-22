@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "UK South"
+    },
+    "resourceGroupName": {
+      "value": "rg-kpep-uks-d-dtran-01"
+    },
+    "storageAccountName": {
+      "value": "stakpepuksdataengmdfdev01"
+    },
+    "dataFactoryName": {
+      "value": "adf-mdf-dev"
+    },
+    "capacityName": {
+      "value": "fabricpreprod"
+    },
+    "workspaceName": {
+      "value": "ws-mdf-dev"
+    }
+  }
+}

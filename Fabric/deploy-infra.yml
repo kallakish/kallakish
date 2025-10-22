@@ -1,0 +1,79 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+- stage: Dev
+  displayName: 'Deploy to DEV'
+  variables:
+    - group: vg-fabric-dev
+  jobs:
+  - job: DeployDev
+    steps:
+    - checkout: self
+    - task: AzureCLI@2
+      displayName: 'Deploy DEV Infra'
+      inputs:
+        azureSubscription: 'sc-azure-fabric'
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az deployment sub create             --name deploy-fabric-dev             --location "UK South"             --template-file infra/main.bicep             --parameters @infra/parameters-dev.json
+
+- stage: Test
+  displayName: 'Deploy to TEST'
+  dependsOn: Dev
+  variables:
+    - group: vg-fabric-test
+  jobs:
+  - job: DeployTest
+    steps:
+    - checkout: self
+    - task: AzureCLI@2
+      displayName: 'Deploy TEST Infra'
+      inputs:
+        azureSubscription: 'sc-azure-fabric'
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az deployment sub create             --name deploy-fabric-test             --location "UK South"             --template-file infra/main.bicep             --parameters @infra/parameters-test.json
+
+- stage: UAT
+  displayName: 'Deploy to UAT'
+  dependsOn: Test
+  variables:
+    - group: vg-fabric-uat
+  jobs:
+  - job: DeployUAT
+    steps:
+    - checkout: self
+    - task: AzureCLI@2
+      displayName: 'Deploy UAT Infra'
+      inputs:
+        azureSubscription: 'sc-azure-fabric'
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az deployment sub create             --name deploy-fabric-uat             --location "UK South"             --template-file infra/main.bicep             --parameters @infra/parameters-uat.json
+
+- stage: Prod
+  displayName: 'Deploy to PROD'
+  dependsOn: UAT
+  variables:
+    - group: vg-fabric-prod
+  jobs:
+  - job: DeployProd
+    steps:
+    - checkout: self
+    - task: AzureCLI@2
+      displayName: 'Deploy PROD Infra'
+      inputs:
+        azureSubscription: 'sc-azure-fabric'
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az deployment sub create             --name deploy-fabric-prod             --location "UK South"             --template-file infra/main.bicep             --parameters @infra/parameters-prod.json
