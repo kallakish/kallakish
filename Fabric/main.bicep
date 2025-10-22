@@ -1,56 +1,64 @@
 param location string
 param resourceGroupName string
 param storageAccountName string
+param keyVaultName string
 param dataFactoryName string
 param capacityName string
 param workspaceName string
 
-resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
-  name: resourceGroupName
-  location: location
-}
-
-resource stg 'Microsoft.Storage/storageAccounts@2023-01-01' = {
-  name: storageAccountName
-  location: location
-  sku: {
-    name: 'Standard_LRS'
-  }
-  kind: 'StorageV2'
-  properties: {}
-}
-
-resource adf 'Microsoft.DataFactory/factories@2018-06-01' = {
-  name: dataFactoryName
-  location: location
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {}
-}
-
-resource fabricCapacity 'Microsoft.Fabric/capacities@2023-11-01' = {
-  name: capacityName
-  location: location
-  sku: {
-    name: 'F2'
-    tier: 'Fabric'
-  }
-  properties: {
-    administration: {
-      members: []
-    }
+module rg './modules/resourceGroup.bicep' = {
+  name: 'rgDeploy'
+  params: {
+    location: location
+    resourceGroupName: resourceGroupName
   }
 }
 
-resource fabricWorkspace 'Microsoft.Fabric/workspaces@2023-11-01' = {
-  name: workspaceName
-  location: location
-  properties: {
-    capacityId: fabricCapacity.id
+module st './modules/storageAccount.bicep' = {
+  name: 'stDeploy'
+  scope: resourceGroup(rg.outputs.resourceGroupName)
+  params: {
+    location: location
+    storageAccountName: storageAccountName
   }
 }
 
-output storageAccountId string = stg.id
-output dataFactoryId string = adf.id
-output fabricWorkspaceId string = fabricWorkspace.id
+module kv './modules/keyVault.bicep' = {
+  name: 'kvDeploy'
+  scope: resourceGroup(rg.outputs.resourceGroupName)
+  params: {
+    location: location
+    keyVaultName: keyVaultName
+  }
+}
+
+module adf './modules/dataFactory.bicep' = {
+  name: 'adfDeploy'
+  scope: resourceGroup(rg.outputs.resourceGroupName)
+  params: {
+    location: location
+    dataFactoryName: dataFactoryName
+  }
+}
+
+module cap './modules/fabricCapacity.bicep' = {
+  name: 'capDeploy'
+  params: {
+    location: location
+    capacityName: capacityName
+  }
+}
+
+module ws './modules/fabricWorkspace.bicep' = {
+  name: 'wsDeploy'
+  params: {
+    location: location
+    workspaceName: workspaceName
+    capacityId: cap.outputs.capacityId
+  }
+}
+
+output storageAccountId string = st.outputs.storageAccountId
+output dataFactoryId string = adf.outputs.dataFactoryId
+output keyVaultId string = kv.outputs.keyVaultId
+output fabricWorkspaceId string = ws.outputs.fabricWorkspaceId

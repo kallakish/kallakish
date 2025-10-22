@@ -11,6 +11,9 @@
     "storageAccountName": {
       "value": "stakpepuksdataengmdftest01"
     },
+    "keyVaultName": {
+      "value": "kv-mdf-adf-test"
+    },
     "dataFactoryName": {
       "value": "adf-mdf-test"
     },
