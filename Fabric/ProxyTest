@@ -1,0 +1,23 @@
+$Proxy = "http://proxy.company.local:8080"   # change this
+$Targets = @(
+  "adf-mdf-dev.uksouth.datafactory.azure.net:443",
+  "servicebus.windows.net:443"
+)
+function Test-ProxyConnect($proxy,$target,$basicAuth=$null){
+  $pUri=[uri]$proxy; $h,$p=$target.Split(":")
+  $c=New-Object System.Net.Sockets.TcpClient($pUri.Host,$pUri.Port)
+  $s=$c.GetStream()
+  $req="CONNECT $h`:$p HTTP/1.1`r`nHost: $h`:$p`r`n"
+  if($basicAuth){$req+="Proxy-Authorization: Basic $basicAuth`r`n"}
+  $req+="`r`n"
+  $b=[Text.Encoding]::ASCII.GetBytes($req)
+  $s.Write($b,0,$b.Length)
+  $buf=New-Object byte[] 1024; $r=$s.Read($buf,0,$buf.Length)
+  $resp=[Text.Encoding]::ASCII.GetString($buf,0,$r)
+  $s.Close(); $c.Close()
+  if($resp -match " 200 "){"OK CONNECT → $target"} else {"FAIL CONNECT → $target : $resp"}
+}
+# If your proxy needs BASIC auth, build it; otherwise keep $auth = $null
+# $auth=[Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("DOMAIN\user:password"))
+$auth=$null
+$Targets | % { Test-ProxyConnect -proxy $Proxy -target $_ -basicAuth $auth }
