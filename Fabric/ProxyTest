@@ -25,6 +25,68 @@ $Targets | % { Test-ProxyConnect -proxy $Proxy -target $_ -basicAuth $auth }
 
 
 
+Simple HEAD (forces TLS 1.2; no proxy)
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Invoke-WebRequest https://adf-mdf-dev.uksouth.datafactory.azure.net/ -Method Head -TimeoutSec 10
+Invoke-WebRequest https://servicebus.windows.net/ -Method Head -TimeoutSec 10
+
+
+If either returns an error like “The underlying connection was closed” → TLS is being intercepted/reset.
+
+Verbose curl (shows where it dies)
+
+curl.exe -vI https://adf-mdf-dev.uksouth.datafactory.azure.net/ --tlsv1.2 --http1.1 --connect-timeout 10 --max-time 15
+curl.exe -vI https://servicebus.windows.net/ --tlsv1.2 --http1.1 --connect-timeout 10 --max-time 15
+
+
+If you see a reset after * CONNECT / * TLSv1.2 negotiation, that’s your NGFW/IDS/transparent proxy terminating the session.
+
+DNS sanity (make sure you’re not forcing a private endpoint)
+
+Resolve-DnsName adf-mdf-dev.uksouth.datafactory.azure.net
+Resolve-DnsName servicebus.windows.net
+
+
+These must be public records (no 10.x/172.16/192.168).
+
+What to change (the fix)
+
+Ask your network/security team to add no-decryption / no-inspection (TLS bypass) for these SNI/FQDNs and allow WebSockets over 443:
+
+adf-mdf-dev.uksouth.datafactory.azure.net (Data Factory control plane)
+
+*.servicebus.windows.net (control channel via AMQP-over-WebSockets)
+
+If you have a PAC file, make those hosts DIRECT.
+If you have a proxy (explicit), it must allow HTTP CONNECT and WebSockets over 443 to those hosts and not SSL-inspect them.
+
+One more sanity tweak (in case the box is hardened)
+
+Ensure TLS 1.2 is enabled and current ciphers are available; then reboot:
+
+# .NET strong crypto
+New-Item -Path "HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319" -Force | Out-Null
+New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319" -Name SchUseStrongCrypto -Value 1 -PropertyType DWord -Force | Out-Null
+New-Item -Path "HKLM:\SOFTWARE\Wow6432Node\Microsoft\.NETFramework\v4.0.30319" -Force | Out-Null
+New-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Microsoft\.NETFramework\v4.0.30319" -Name SchUseStrongCrypto -Value 1 -PropertyType DWord -Force | Out-Null
+
+# SCHANNEL TLS 1.2 (client)
+New-Item -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client" -Force | Out-Null
+New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client" -Name Enabled -Value 1 -PropertyType DWord -Force | Out-Null
+New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client" -Name DisabledByDefault -Value 0 -PropertyType DWord -Force | Out-Null
+
+After the network change
+
+Regenerate a fresh SHIR key in ADF (Manage → Integration runtimes → your SHIR → Keys) and use that in the SHIR config.
+
+Restart services: Integration Runtime Service and DIAHostService.
+
+Register again.
+
+If you want, paste the 2–3 lines around the failure from the curl -vI output; I’ll tell you exactly whether it’s SSL inspection, a CONNECT policy, or an IDS reset.
+
+
 Handshake :
 
 
