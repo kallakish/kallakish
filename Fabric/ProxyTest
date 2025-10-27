@@ -21,3 +21,24 @@ function Test-ProxyConnect($proxy,$target,$basicAuth=$null){
 # $auth=[Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("DOMAIN\user:password"))
 $auth=$null
 $Targets | % { Test-ProxyConnect -proxy $Proxy -target $_ -basicAuth $auth }
+
+
+
+
+Handshake :
+
+
+# ADF control plane
+$h="adf-mdf-dev.uksouth.datafactory.azure.net"
+$tcp=New-Object Net.Sockets.TcpClient($h,443); $ssl=New-Object Net.Security.SslStream($tcp.GetStream(),$false,({$true}))
+$ssl.AuthenticateAsClient($h); $c=New-Object Security.Cryptography.X509Certificates.X509Certificate2 $ssl.RemoteCertificate
+"`nHOST: $h"; "TLS: $($ssl.SslProtocol)"; "Subject: $($c.Subject)"; "Issuer: $($c.Issuer)"
+$ssl.Close(); $tcp.Close()
+
+# Service Bus
+$h="servicebus.windows.net"
+$tcp=New-Object Net.Sockets.TcpClient($h,443); $ssl=New-Object Net.Security.SslStream($tcp.GetStream(),$false,({$true}))
+$ssl.AuthenticateAsClient($h); $c=New-Object Security.Cryptography.X509Certificates.X509Certificate2 $ssl.RemoteCertificate
+"`nHOST: $h"; "TLS: $($ssl.SslProtocol)"; "Subject: $($c.Subject)"; "Issuer: $($c.Issuer)"
+$ssl.Close(); $tcp.Close()
+
