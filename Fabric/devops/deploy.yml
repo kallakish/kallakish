@@ -1,0 +1,132 @@
+trigger: none   # run manually or set to main branch
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  azureServiceConnection: 'SC-NAME'      # your service connection name
+  location: 'uksouth'                    # region
+  rgName: 'rg-fabric-dev-storage'        # single environment RG
+
+stages:
+- stage: Deploy
+  displayName: 'Deploy Storage (single environment with prints)'
+  jobs:
+  - job: Run
+    displayName: 'Run storage deployment'
+    steps:
+    - checkout: self
+
+    # =============================
+    # 1️⃣ Print environment details
+    # =============================
+    - task: AzureCLI@2
+      displayName: 'Print debug info'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "============================================================"
+          echo "🔧 ENVIRONMENT DEBUG INFO"
+          echo "============================================================"
+          echo "Azure Service Connection : $(azureServiceConnection)"
+          echo "Location                 : $(location)"
+          echo "Resource Group           : $(rgName)"
+          echo "Build Source Directory   : $(Build.SourcesDirectory)"
+          echo "Pipeline Workspace       : $(Pipeline.Workspace)"
+          echo "Agent Machine Name       : $AGENT_MACHINENAME"
+          echo "Agent OS                 : $AGENT_OS"
+          echo "Agent Temp Directory     : $AGENT_TEMPDIRECTORY"
+          echo "============================================================"
+          echo "Logged in user (Service Principal)"
+          az account show --output table
+          echo "============================================================"
+
+    # =============================
+    # 2️⃣ (Optional) Validate Bicep
+    # =============================
+    - task: AzureCLI@2
+      displayName: 'Bicep syntax check and print output path'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "------------------------------------------------------------"
+          echo "🔍 Checking Bicep syntax..."
+          az bicep version || az bicep install
+          echo "------------------------------------------------------------"
+          az bicep build --file infra/storage-only.bicep --outfile out/storage.json
+          echo "✅ Bicep compiled successfully -> out/storage.json"
+          echo "Preview of compiled file head:"
+          head -n 10 out/storage.json
+          echo "------------------------------------------------------------"
+
+    # =============================
+    # 3️⃣ Ensure Resource Group
+    # =============================
+    - task: AzureCLI@2
+      displayName: 'Create / ensure resource group'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "------------------------------------------------------------"
+          echo "📦 Ensuring resource group exists..."
+          echo "Resource Group: $(rgName)"
+          echo "Location      : $(location)"
+          az group create -n "$(rgName)" -l "$(location)" --output table
+          echo "------------------------------------------------------------"
+
+    # =============================
+    # 4️⃣ What-if deployment
+    # =============================
+    - task: AzureCLI@2
+      displayName: 'Run what-if (preview changes)'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "------------------------------------------------------------"
+          echo "🔎 Running WHAT-IF to preview Storage Account changes..."
+          echo "------------------------------------------------------------"
+          az deployment group what-if \
+            --resource-group "$(rgName)" \
+            --template-file infra/storage-only.bicep \
+            --parameters @infra/params.single.json \
+            --output table
+          echo "------------------------------------------------------------"
+          echo "✅ WHAT-IF completed. If no errors above, proceeding to deploy."
+          echo "------------------------------------------------------------"
+
+    # =============================
+    # 5️⃣ Actual deployment
+    # =============================
+    - task: AzureCLI@2
+      displayName: 'Deploy storage account'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "------------------------------------------------------------"
+          echo "🚀 Starting DEPLOYMENT of Storage Account..."
+          echo "Resource Group : $(rgName)"
+          echo "Location       : $(location)"
+          echo "Template       : infra/storage-only.bicep"
+          echo "Parameters     : infra/params.single.json"
+          echo "------------------------------------------------------------"
+
+          az deployment group create \
+            --name "deploy-storage-$(Build.BuildId)" \
+            --resource-group "$(rgName)" \
+            --template-file infra/storage-only.bicep \
+            --parameters @infra/params.single.json \
+            --output table
+
+          echo "------------------------------------------------------------"
+          echo "✅ DEPLOYMENT COMPLETE"
+          echo "------------------------------------------------------------"
