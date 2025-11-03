@@ -58,6 +58,18 @@ module ws './modules/fabricWorkspace.bicep' = {
   }
 }
 
+
+module rbac './modules/rbacAssignments.bicep' = {
+  name: 'rbacAssign'
+  scope: resourceGroup(rg.name)
+  params: {
+    adminGroupObjectId: adminGroupObjectId
+    storageAccountId: storage.outputs.storageAccountId
+    keyVaultId: kv.outputs.keyVaultId
+    dataFactoryId: adf.outputs.dataFactoryId
+  }
+}
+
 output storageAccountId string = st.outputs.storageAccountId
 output dataFactoryId string = adf.outputs.dataFactoryId
 output keyVaultId string = kv.outputs.keyVaultId
