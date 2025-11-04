@@ -1,0 +1,50 @@
+# Configuration-driven deploy (see docs: Configuration Deployment)
+# Environment keys here must match what you pass in --environment
+
+core:
+  # Either workspace name(s) or IDs. IDs take precedence if both present.
+  workspace_id:
+    dev: ""     # e.g., 00000000-0000-0000-0000-000000000001
+    test: ""    # e.g., 00000000-0000-0000-0000-000000000002
+    prod: ""    # e.g., 00000000-0000-0000-0000-000000000003
+
+  # Deploy from current repo root
+  repository_directory: "."
+
+  # Limit to these item types (remove block to deploy all supported types)
+  item_types_in_scope:
+    - Notebook
+    - DataPipeline
+    - Environment
+    - Lakehouse
+    - SemanticModel
+    - Report
+    - Warehouse
+    - Dataflow
+
+  # Parameter file for environment-specific replacements
+  parameter: "parameter.yml"
+
+publish:
+  # Example: exclude items/folders by regex if needed
+  # exclude_regex: "^DONT_DEPLOY.*"
+  # folder_exclude_regex: "^experiments/"
+  skip:
+    dev: false
+    test: false
+    prod: false
+
+unpublish:
+  # Prevent destructive actions by default
+  skip:
+    dev: true
+    test: true
+    prod: true
+
+features:
+  - enable_experimental_features     # required for config deploy
+  - enable_config_deploy
+  # - enable_items_to_include        # if you want to selectively publish items (not recommended)
+
+# constants:
+#   DEFAULT_API_ROOT_URL: "https://api.fabric.microsoft.com"

@@ -1,0 +1,41 @@
+# Environment parameterization examples
+# Place this file at the root of your Fabric repo (same level as item folders)
+
+# 1) Data Pipeline connection remapping (JSONPath)
+# Replace the connection GUID inside pipeline JSON to the target env's connection GUID
+key_value_replace:
+  - find_key: $.properties.activities[?(@.name=="Copy Data")].typeProperties.source.datasetSettings.externalReferences.connection
+    replace_value:
+      dev: "00000000-0000-0000-0000-0000000000AA"
+      test: "00000000-0000-0000-0000-0000000000BB"
+      prod: "00000000-0000-0000-0000-0000000000CC"
+    item_type: "DataPipeline"
+    # item_name: "Example Pipeline"   # uncomment to target a specific pipeline
+
+# 2) Notebook lakehouse/workspace ID remapping using regex with capture group
+find_replace:
+  - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F-]{36})"
+    replace_value:
+      dev: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+      test: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+      prod: "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    is_regex: "true"
+    item_type: "Notebook"
+
+# 3) Toggle schedules by environment (JSONPath)
+  - find_value: "PLACEHOLDER_NOT_USED"  # dummy entry to keep YAML valid when only using key_value_replace above
+
+# Example: enable Execute jobs only in prod
+# (This targets .schedules files that live alongside items)
+# key_value_replace:
+#   - find_key: $.schedules[?(@.jobType=="Execute")].enabled
+#     replace_value:
+#       dev: false
+#       test: false
+#       prod: true
+#     file_path: "**/.schedules"
+
+# 4) Optional: Data Gateway binding for on-prem sources (SemanticModel)
+# gateway_binding:
+#   - gateway_id: "<your-gateway-guid>"
+#     dataset_name: ["Your Dataset 1","Your Dataset 2"]

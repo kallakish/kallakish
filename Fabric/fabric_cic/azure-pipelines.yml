@@ -1,0 +1,51 @@
+# Azure DevOps pipeline for Microsoft Fabric deployments via fabric-cicd
+# Replace 'your-service-connection' with your ARM/AzureCLI service connection name.
+
+trigger:
+  branches:
+    include:
+      - main
+      - dev
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  # Set these in the pipeline UI / Variable Groups / Key Vault
+  ENVIRONMENT: 'dev'             # dev | test | prod
+  # WORKSPACE IDs to target per environment (use GUIDs of the *target* workspaces)
+  WORKSPACE_ID_DEV: ''
+  WORKSPACE_ID_TEST: ''
+  WORKSPACE_ID_PROD: ''
+
+stages:
+- stage: Deploy
+  jobs:
+  - job: Run
+    steps:
+    - checkout: self
+
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.12'
+        addToPath: true
+
+    - script: |
+        python -m pip install --upgrade pip
+        pip install fabric-cicd azure-identity
+      displayName: 'Install fabric-cicd'
+
+    # Option A: Authenticate via AzureCLI service connection and let DefaultAzureCredential pick it up
+    - task: AzureCLI@2
+      displayName: 'Deploy Fabric items (via Python)'
+      inputs:
+        azureSubscription: 'your-service-connection'   # <-- CHANGE ME
+        scriptType: 'ps'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          $ErrorActionPreference = 'Stop'
+          python -u ./.deploy/fabric_workspace.py `
+            --environment $(ENVIRONMENT) `
+            --workspace_id_dev $(WORKSPACE_ID_DEV) `
+            --workspace_id_test $(WORKSPACE_ID_TEST) `
+            --workspace_id_prod $(WORKSPACE_ID_PROD)
