@@ -1,0 +1,163 @@
+# Azure DevOps multi-stage pipeline for Microsoft Fabric deployments via fabric-cicd
+# Stages: Dev -> Test -> Prod
+# Each stage binds to its own Variable Group so you can keep workspace IDs & ENV separate.
+
+trigger:
+  branches:
+    include:
+      - main
+      - dev
+
+pool:
+  vmImage: 'windows-latest'
+
+# Toggle which stages to run (you can also set these at queue time)
+variables:
+  RUN_DEV: 'true'
+  RUN_TEST: 'false'
+  RUN_PROD: 'false'
+
+stages:
+# =====================
+# DEV
+# =====================
+- stage: DevDeploy
+  displayName: 'Deploy to DEV'
+  condition: and(succeeded(), eq(variables['RUN_DEV'], 'true'))
+  variables:
+  - group: Fabric-Common   # TENANT_ID, CLIENT_ID, CLIENT_SECRET (secrets)
+  - group: Fabric-Dev      # ENVIRONMENT=dev, WORKSPACE_ID_DEV
+  jobs:
+  - job: Deploy
+    steps:
+    - checkout: self
+
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.12'
+        addToPath: true
+
+    - script: |
+        python -m pip install --upgrade pip
+        pip install fabric-cicd azure-identity
+      displayName: 'Install fabric-cicd'
+
+    - task: AzureCLI@2
+      displayName: 'Deploy Fabric items (DEV)'
+      inputs:
+        azureSubscription: 'your-service-connection'   # <-- CHANGE ME
+        scriptType: 'ps'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          $ErrorActionPreference = 'Stop'
+          # Expose secrets for fabric-cicd auth (SPN), or rely on the service connection's AzureCLI context
+          if ("$(TENANT_ID)" -and "$(CLIENT_ID)" -and "$(CLIENT_SECRET)") {
+            $env:TENANT_ID = "$(TENANT_ID)"
+            $env:CLIENT_ID = "$(CLIENT_ID)"
+            $env:CLIENT_SECRET = "$(CLIENT_SECRET)"
+          }
+          python -u ./.deploy/fabric_workspace.py `
+            --environment $(ENVIRONMENT) `
+            --workspace_id_dev $(WORKSPACE_ID_DEV)
+
+# =====================
+# TEST
+# =====================
+- stage: TestDeploy
+  displayName: 'Deploy to TEST'
+  dependsOn: DevDeploy
+  condition: and(succeeded(), eq(variables['RUN_TEST'], 'true'))
+  variables:
+  - group: Fabric-Common   # TENANT_ID, CLIENT_ID, CLIENT_SECRET (secrets)
+  - group: Fabric-Test     # ENVIRONMENT=test, WORKSPACE_ID_TEST
+  jobs:
+  - job: PreApproval
+    displayName: 'Manual approval for TEST'
+    steps:
+    - task: ManualValidation@0
+      inputs:
+        instructions: 'Approve to deploy to TEST workspace.'
+        onTimeout: 'reject'
+        timeout: '0'  # no timeout
+  - job: Deploy
+    dependsOn: PreApproval
+    steps:
+    - checkout: self
+
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.12'
+        addToPath: true
+
+    - script: |
+        python -m pip install --upgrade pip
+        pip install fabric-cicd azure-identity
+      displayName: 'Install fabric-cicd'
+
+    - task: AzureCLI@2
+      displayName: 'Deploy Fabric items (TEST)'
+      inputs:
+        azureSubscription: 'your-service-connection'   # <-- CHANGE ME
+        scriptType: 'ps'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          $ErrorActionPreference = 'Stop'
+          if ("$(TENANT_ID)" -and "$(CLIENT_ID)" -and "$(CLIENT_SECRET)") {
+            $env:TENANT_ID = "$(TENANT_ID)"
+            $env:CLIENT_ID = "$(CLIENT_ID)"
+            $env:CLIENT_SECRET = "$(CLIENT_SECRET)"
+          }
+          python -u ./.deploy/fabric_workspace.py `
+            --environment $(ENVIRONMENT) `
+            --workspace_id_test $(WORKSPACE_ID_TEST)
+
+# =====================
+# PROD
+# =====================
+- stage: ProdDeploy
+  displayName: 'Deploy to PROD'
+  dependsOn: TestDeploy
+  condition: and(succeeded(), eq(variables['RUN_PROD'], 'true'))
+  variables:
+  - group: Fabric-Common   # TENANT_ID, CLIENT_ID, CLIENT_SECRET (secrets)
+  - group: Fabric-Prod     # ENVIRONMENT=prod, WORKSPACE_ID_PROD
+  jobs:
+  - job: PreApproval
+    displayName: 'Manual approval for PROD'
+    steps:
+    - task: ManualValidation@0
+      inputs:
+        instructions: 'Approve to deploy to PROD workspace.'
+        onTimeout: 'reject'
+        timeout: '0'  # no timeout
+  - job: Deploy
+    dependsOn: PreApproval
+    steps:
+    - checkout: self
+
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.12'
+        addToPath: true
+
+    - script: |
+        python -m pip install --upgrade pip
+        pip install fabric-cicd azure-identity
+      displayName: 'Install fabric-cicd'
+
+    - task: AzureCLI@2
+      displayName: 'Deploy Fabric items (PROD)'
+      inputs:
+        azureSubscription: 'your-service-connection'   # <-- CHANGE ME
+        scriptType: 'ps'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          $ErrorActionPreference = 'Stop'
+          if ("$(TENANT_ID)" -and "$(CLIENT_ID)" -and "$(CLIENT_SECRET)") {
+            $env:TENANT_ID = "$(TENANT_ID)"
+            $env:CLIENT_ID = "$(CLIENT_ID)"
+            $env:CLIENT_SECRET = "$(CLIENT_SECRET)"
+          }
+          python -u ./.deploy/fabric_workspace.py `
+            --environment $(ENVIRONMENT) `
+            --workspace_id_prod $(WORKSPACE_ID_PROD)

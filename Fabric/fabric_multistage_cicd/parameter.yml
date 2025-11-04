@@ -1,0 +1,17 @@
+# Parameterization examples for environment-specific replacements
+key_value_replace:
+  - find_key: $.properties.activities[?(@.name=="Copy Data")].typeProperties.source.datasetSettings.externalReferences.connection
+    replace_value:
+      dev: "00000000-0000-0000-0000-0000000000AA"
+      test: "00000000-0000-0000-0000-0000000000BB"
+      prod: "00000000-0000-0000-0000-0000000000CC"
+    item_type: "DataPipeline"
+
+find_replace:
+  - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F-]{36})"
+    replace_value:
+      dev: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+      test: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+      prod: "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    is_regex: "true"
+    item_type: "Notebook"

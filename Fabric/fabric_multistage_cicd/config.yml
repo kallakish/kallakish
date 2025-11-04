@@ -1,0 +1,32 @@
+core:
+  workspace_id:
+    dev: ""
+    test: ""
+    prod: ""
+  repository_directory: "."
+  item_types_in_scope:
+    - Notebook
+    - DataPipeline
+    - Environment
+    - Lakehouse
+    - SemanticModel
+    - Report
+    - Warehouse
+    - Dataflow
+  parameter: "parameter.yml"
+
+publish:
+  skip:
+    dev: false
+    test: false
+    prod: false
+
+unpublish:
+  skip:
+    dev: true
+    test: true
+    prod: true
+
+features:
+  - enable_experimental_features
+  - enable_config_deploy
