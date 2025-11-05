@@ -179,3 +179,35 @@ stages:
     pip install fabric-cicd azure-identity
   displayName: 'Install fabric-cicd'
 
+
+
+  trigger: none  # run manually
+
+pool:
+  name: 'azure preprod pipelines'   # <-- your self-hosted pool
+
+stages:
+- stage: Setup
+  jobs:
+  - job: InstallFabricCICD
+    steps:
+    - powershell: |
+        # Refresh PATH (handy if the agent service was started before Python install)
+        $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' +
+                    [Environment]::GetEnvironmentVariable('Path','User')
+
+        python -V
+        # optional but recommended to avoid old-pip issues:
+        python -m pip install --upgrade pip
+
+        # install fabric-cicd (pin to the doc version) + auth helper
+        pip install fabric-cicd==0.1.30 azure-identity
+
+        # quick sanity check
+        python - << 'PY'
+import importlib.metadata as m
+print("fabric-cicd", m.version("fabric-cicd"))
+PY
+      displayName: 'Install fabric-cicd'
+
+
