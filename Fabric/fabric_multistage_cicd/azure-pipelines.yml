@@ -161,3 +161,21 @@ stages:
           python -u ./.deploy/fabric_workspace.py `
             --environment $(ENVIRONMENT) `
             --workspace_id_prod $(WORKSPACE_ID_PROD)
+
+
+
+
+
+
+
+
+
+- powershell: |
+    # (optional) refresh PATH in case the agent service hasn't been restarted
+    $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' +
+                [Environment]::GetEnvironmentVariable('Path','User')
+
+    python -m pip install --upgrade pip
+    pip install fabric-cicd azure-identity
+  displayName: 'Install fabric-cicd'
+
