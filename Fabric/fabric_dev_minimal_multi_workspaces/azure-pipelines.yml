@@ -1,66 +1,116 @@
+# trigger:
+# - main
+
+# pool:
+#   name: Default   # Your self-hosted agent pool if applicable
+
+# variables:
+# - group: Fabric-Secrets    # FABRIC_CLIENT_ID, FABRIC_TENANT_ID, FABRIC_CLIENT_SECRET
+# - group: fabric_common     # FABRIC_WORKSPACE_ID_DEV, FABRIC_WORKSPACE_ID_TEST, FABRIC_WORKSPACE_ID_PROD
+
+# stages:
+# - stage: Deploy_Dev
+#   displayName: 'Deploy to DEV'
+#   jobs:
+#   - job: Deploy_Dev_Job
+#     displayName: 'Deploy DEV Fabric Workspace'
+#     steps:
+#     - script: |
+#         "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
+#         "C:/Program Files/Python312/python.exe" -m pip install fabric-cicd
+#       displayName: 'Install fabric-cicd'
+#     - script: |
+#         "C:/Program Files/Python312/python.exe" deploy.py --workspace-id $(FABRIC_WORKSPACE_ID_DEV) --environment DEV --repo-dir workspaces/workspace_alpha/fabric_items
+#       displayName: 'Deploy DEV Items'
+#       env:
+#         FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+#         FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+#         FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+
+# - stage: Deploy_Test
+#   displayName: 'Deploy to TEST'
+#   dependsOn: Deploy_Dev
+#   jobs:
+#   - job: Deploy_Test_Job
+#     displayName: 'Deploy TEST Fabric Workspace'
+#     steps:
+#     - script: |
+#         "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
+#         "C:/Program Files/Python312/python.exe" -m pip install fabric-cicd
+#       displayName: 'Install fabric-cicd'
+#     - script: |
+#         "C:/Program Files/Python312/python.exe" deploy.py --workspace-id $(FABRIC_WORKSPACE_ID_TEST) --environment TEST --repo-dir workspaces/workspace_alpha/fabric_items
+#       displayName: 'Deploy TEST Items'
+#       env:
+#         FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+#         FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+#         FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+
+# - stage: Deploy_Prod
+#   displayName: 'Deploy to PROD'
+#   dependsOn: Deploy_Test
+#   jobs:
+#   - job: Deploy_Prod_Job
+#     displayName: 'Deploy PROD Fabric Workspace'
+#     steps:
+#     - script: |
+#         "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
+#         "C:/Program Files/Python312/python.exe" -m pip install fabric-cicd
+#       displayName: 'Install fabric-cicd'
+#     - script: |
+#         "C:/Program Files/Python312/python.exe" deploy.py --workspace-id $(FABRIC_WORKSPACE_ID_PROD) --environment PROD --repo-dir workspaces/workspace_alpha/fabric_items
+#       displayName: 'Deploy PROD Items'
+#       env:
+#         FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+#         FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+#         FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
 trigger:
 - main
 
-pool:
-  name: Default   # Your self-hosted agent pool if applicable
-
 variables:
 - group: Fabric-Secrets    # FABRIC_CLIENT_ID, FABRIC_TENANT_ID, FABRIC_CLIENT_SECRET
-- group: fabric_common     # FABRIC_WORKSPACE_ID_DEV, FABRIC_WORKSPACE_ID_TEST, FABRIC_WORKSPACE_ID_PROD
+- group: fabric_common     # workspace IDs
 
-stages:
-- stage: Deploy_Dev
-  displayName: 'Deploy to DEV'
-  jobs:
-  - job: Deploy_Dev_Job
-    displayName: 'Deploy DEV Fabric Workspace'
-    steps:
-    - script: |
-        "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
-        "C:/Program Files/Python312/python.exe" -m pip install fabric-cicd
-      displayName: 'Install fabric-cicd'
-    - script: |
-        "C:/Program Files/Python312/python.exe" deploy.py --workspace-id $(FABRIC_WORKSPACE_ID_DEV) --environment DEV --repo-dir workspaces/workspace_alpha/fabric_items
-      displayName: 'Deploy DEV Items'
-      env:
-        FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
-        FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
-        FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+pool:
+  name: Default
 
-- stage: Deploy_Test
-  displayName: 'Deploy to TEST'
-  dependsOn: Deploy_Dev
-  jobs:
-  - job: Deploy_Test_Job
-    displayName: 'Deploy TEST Fabric Workspace'
-    steps:
-    - script: |
-        "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
-        "C:/Program Files/Python312/python.exe" -m pip install fabric-cicd
-      displayName: 'Install fabric-cicd'
-    - script: |
-        "C:/Program Files/Python312/python.exe" deploy.py --workspace-id $(FABRIC_WORKSPACE_ID_TEST) --environment TEST --repo-dir workspaces/workspace_alpha/fabric_items
-      displayName: 'Deploy TEST Items'
-      env:
-        FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
-        FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
-        FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+steps:
+- script: |
+    "C:/Program Files/Python312/python.exe" -m pip install fabric-cicd
+    "C:/Program Files/Python312/python.exe" -m pip install msal pyjwt
+  displayName: 'Install packages'
 
-- stage: Deploy_Prod
-  displayName: 'Deploy to PROD'
-  dependsOn: Deploy_Test
-  jobs:
-  - job: Deploy_Prod_Job
-    displayName: 'Deploy PROD Fabric Workspace'
-    steps:
-    - script: |
-        "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
-        "C:/Program Files/Python312/python.exe" -m pip install fabric-cicd
-      displayName: 'Install fabric-cicd'
-    - script: |
-        "C:/Program Files/Python312/python.exe" deploy.py --workspace-id $(FABRIC_WORKSPACE_ID_PROD) --environment PROD --repo-dir workspaces/workspace_alpha/fabric_items
-      displayName: 'Deploy PROD Items'
-      env:
-        FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
-        FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
-        FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+- script: |
+    set -e
+    echo "Printing Service Principal token claims for debugging..."
+    "C:/Program Files/Python312/python.exe" -c "
+import msal, os, jwt
+client_id = os.environ['FABRIC_CLIENT_ID']
+tenant_id = os.environ['FABRIC_TENANT_ID']
+client_secret = os.environ['FABRIC_CLIENT_SECRET']
+app = msal.ConfidentialClientApplication(
+    client_id, authority=f'https://login.microsoftonline.com/{tenant_id}',
+    client_credential=client_secret
+)
+result = app.acquire_token_for_client(scopes=['https://analysis.windows.net/powerbi/api/.default'])
+token = result.get('access_token')
+if not token:
+    print('Failed to acquire token:', result)
+    exit(1)
+decoded = jwt.decode(token, options={'verify_signature': False}, algorithms=['RS256'])
+for k, v in decoded.items():
+    print(f'{k}: {v}')
+"
+  displayName: 'Print SPN Token Claims'
+  env:
+    FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+    FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+    FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+
+- script: |
+    "C:/Program Files/Python312/python.exe" deploy.py --workspace-id $(FABRIC_WORKSPACE_ID_DEV) --environment DEV --repo-dir workspaces/workspace_alpha/fabric_items
+  displayName: 'Deploy to Fabric Workspace'
+  env:
+    FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+    FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+    FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
