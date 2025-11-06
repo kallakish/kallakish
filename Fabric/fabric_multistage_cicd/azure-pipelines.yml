@@ -255,3 +255,30 @@ config_override = {
         config_override["core"] = {"workspace_id": override_ws}
 
 
+
+
+
+
+- task: AzureCLI@2
+  displayName: 'Deploy via venv (DEV)'
+  inputs:
+    azureSubscription: 'your-service-connection'
+    scriptType: ps
+    scriptLocation: inlineScript
+    inlineScript: |
+      $ErrorActionPreference = 'Stop'
+
+      $py = "C:\Program Files\Python312\python.exe"
+      & $py -m venv .venv
+      & .\.venv\Scripts\python.exe -m pip install -U pip fabric-cicd==0.1.30 azure-identity
+
+      if ("$(TENANT_ID)" -and "$(CLIENT_ID)" -and "$(CLIENT_SECRET)") {
+        $env:TENANT_ID = "$(TENANT_ID)"
+        $env:CLIENT_ID = "$(CLIENT_ID)"
+        $env:CLIENT_SECRET = "$(CLIENT_SECRET)"
+      }
+
+      & .\.venv\Scripts\python.exe -V
+      & .\.venv\Scripts\python.exe -u .\.deploy\fabric_workspace.py `
+        --environment $(ENVIRONMENT) `
+        --workspace_id_dev $(WORKSPACE_ID_DEV)
