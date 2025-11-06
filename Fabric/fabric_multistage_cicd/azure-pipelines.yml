@@ -239,3 +239,14 @@ PY
 
 
 
+        - powershell: |
+    Write-Host "Looking for config.yml at $(Build.SourcesDirectory)\config.yml"
+    if (Test-Path "$(Build.SourcesDirectory)\config.yml") {
+      Get-Content "$(Build.SourcesDirectory)\config.yml"
+    } else {
+      Write-Host "Not found at repo root."
+    }
+
+
+
+
