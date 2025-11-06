@@ -81,31 +81,14 @@ steps:
   displayName: 'Install packages'
 
 - script: |
-    set -e
-    echo "Printing Service Principal token claims for debugging..."
-    "C:/Program Files/Python312/python.exe" -c "
-import msal, os, jwt
-client_id = os.environ['FABRIC_CLIENT_ID']
-tenant_id = os.environ['FABRIC_TENANT_ID']
-client_secret = os.environ['FABRIC_CLIENT_SECRET']
-app = msal.ConfidentialClientApplication(
-    client_id, authority=f'https://login.microsoftonline.com/{tenant_id}',
-    client_credential=client_secret
-)
-result = app.acquire_token_for_client(scopes=['https://analysis.windows.net/powerbi/api/.default'])
-token = result.get('access_token')
-if not token:
-    print('Failed to acquire token:', result)
-    exit(1)
-decoded = jwt.decode(token, options={'verify_signature': False}, algorithms=['RS256'])
-for k, v in decoded.items():
-    print(f'{k}: {v}')
-"
+    - script: |
+    "C:/Program Files/Python312/python.exe" print_token_claims.py
   displayName: 'Print SPN Token Claims'
   env:
     FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
     FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
     FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+
 
 - script: |
     "C:/Program Files/Python312/python.exe" deploy.py --workspace-id $(FABRIC_WORKSPACE_ID_DEV) --environment DEV --repo-dir workspaces/workspace_alpha/fabric_items
