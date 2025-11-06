@@ -2,23 +2,65 @@ trigger:
 - main
 
 pool:
-  name: Default # or your self-hosted agent pool name
+  name: Default   # Your self-hosted agent pool if applicable
 
 variables:
-- group: Fabric-Secrets # Your DevOps library group for SPN credentials
+- group: Fabric-Secrets    # FABRIC_CLIENT_ID, FABRIC_TENANT_ID, FABRIC_CLIENT_SECRET
+- group: fabric_common     # FABRIC_WORKSPACE_ID_DEV, FABRIC_WORKSPACE_ID_TEST, FABRIC_WORKSPACE_ID_PROD
 
-steps:
-- script: |
-    "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
-    "C:/Program Files/Python312/python.exe" -m pip install fabric-cicd
-  displayName: 'Install fabric-cicd'
+stages:
+- stage: Deploy_Dev
+  displayName: 'Deploy to DEV'
+  jobs:
+  - job: Deploy_Dev_Job
+    displayName: 'Deploy DEV Fabric Workspace'
+    steps:
+    - script: |
+        "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
+        "C:/Program Files/Python312/python.exe" -m pip install fabric-cicd
+      displayName: 'Install fabric-cicd'
+    - script: |
+        "C:/Program Files/Python312/python.exe" deploy.py --workspace-id $(FABRIC_WORKSPACE_ID_DEV) --environment DEV --repo-dir workspaces/workspace_alpha/fabric_items
+      displayName: 'Deploy DEV Items'
+      env:
+        FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+        FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+        FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
 
-- script: |
-    "C:/Program Files/Python312/python.exe" deploy.py --workspace-id WORKSPACE_ALPHA_ID --environment DEV --repo-dir workspaces/workspace_alpha/fabric_items
-    "C:/Program Files/Python312/python.exe" deploy.py --workspace-id WORKSPACE_BETA_ID --environment DEV --repo-dir workspaces/workspace_beta/fabric_items
-    "C:/Program Files/Python312/python.exe" deploy.py --workspace-id WORKSPACE_GAMMA_ID --environment DEV --repo-dir workspaces/workspace_gamma/fabric_items
-  displayName: 'Deploy Multiple Fabric Workspaces'
-  env:
-    FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
-    FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
-    FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+- stage: Deploy_Test
+  displayName: 'Deploy to TEST'
+  dependsOn: Deploy_Dev
+  jobs:
+  - job: Deploy_Test_Job
+    displayName: 'Deploy TEST Fabric Workspace'
+    steps:
+    - script: |
+        "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
+        "C:/Program Files/Python312/python.exe" -m pip install fabric-cicd
+      displayName: 'Install fabric-cicd'
+    - script: |
+        "C:/Program Files/Python312/python.exe" deploy.py --workspace-id $(FABRIC_WORKSPACE_ID_TEST) --environment TEST --repo-dir workspaces/workspace_alpha/fabric_items
+      displayName: 'Deploy TEST Items'
+      env:
+        FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+        FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+        FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+
+- stage: Deploy_Prod
+  displayName: 'Deploy to PROD'
+  dependsOn: Deploy_Test
+  jobs:
+  - job: Deploy_Prod_Job
+    displayName: 'Deploy PROD Fabric Workspace'
+    steps:
+    - script: |
+        "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
+        "C:/Program Files/Python312/python.exe" -m pip install fabric-cicd
+      displayName: 'Install fabric-cicd'
+    - script: |
+        "C:/Program Files/Python312/python.exe" deploy.py --workspace-id $(FABRIC_WORKSPACE_ID_PROD) --environment PROD --repo-dir workspaces/workspace_alpha/fabric_items
+      displayName: 'Deploy PROD Items'
+      env:
+        FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+        FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+        FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
