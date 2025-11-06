@@ -1,0 +1,24 @@
+trigger:
+- main
+
+pool:
+  name: Default # or your self-hosted agent pool name
+
+variables:
+- group: Fabric-Secrets # Your DevOps library group for SPN credentials
+
+steps:
+- script: |
+    "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
+    "C:/Program Files/Python312/python.exe" -m pip install fabric-cicd
+  displayName: 'Install fabric-cicd'
+
+- script: |
+    "C:/Program Files/Python312/python.exe" deploy.py --workspace-id WORKSPACE_ALPHA_ID --environment DEV --repo-dir workspaces/workspace_alpha/fabric_items
+    "C:/Program Files/Python312/python.exe" deploy.py --workspace-id WORKSPACE_BETA_ID --environment DEV --repo-dir workspaces/workspace_beta/fabric_items
+    "C:/Program Files/Python312/python.exe" deploy.py --workspace-id WORKSPACE_GAMMA_ID --environment DEV --repo-dir workspaces/workspace_gamma/fabric_items
+  displayName: 'Deploy Multiple Fabric Workspaces'
+  env:
+    FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+    FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+    FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)

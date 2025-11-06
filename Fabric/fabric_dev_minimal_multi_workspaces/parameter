@@ -1,0 +1,6 @@
+key_value_replace:
+  - find_key: $.properties.activities[?(@.name=="Copy Data")].typeProperties.source.datasetSettings.externalReferences.connection
+    replace_value:
+      dev: "00000000-0000-0000-0000-0000000000AA"
+      test: "00000000-0000-0000-0000-0000000000BB"
+    item_type: "DataPipeline"
