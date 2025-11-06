@@ -248,5 +248,10 @@ PY
     }
 
 
+config_override = {
+        "features": ["enable_experimental_features", "enable_config_deploy"]
+    }
+    if override_ws:
+        config_override["core"] = {"workspace_id": override_ws}
 
 
