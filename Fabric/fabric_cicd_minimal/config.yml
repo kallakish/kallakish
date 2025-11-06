@@ -1,0 +1,13 @@
+# Minimal config.yml for fabric-cicd (config-based deploy)
+core:
+  workspace_id:
+    dev: "REPLACE_DEV_WORKSPACE_ID"
+    test: "REPLACE_TEST_WORKSPACE_ID"
+    prod: "REPLACE_PROD_WORKSPACE_ID"
+  repository_directory: "."
+  parameter: "parameter.yml"
+
+# Required feature flags for config-based deployment
+features:
+  - enable_experimental_features
+  - enable_config_deploy
