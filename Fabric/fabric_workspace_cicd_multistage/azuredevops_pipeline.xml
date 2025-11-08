@@ -1,0 +1,85 @@
+trigger: none
+
+variables:
+  - group: fabric_common   # Shared variables (tenant id, client id etc.)
+
+stages:
+- stage: DeployDev
+  displayName: 'Deploy Fabric Workspace to Dev'
+  variables:
+    - name: environment
+      value: 'dev'                 # Set environment name for this stage
+    - group: fabric_${{ variables.environment }}   # Dev-specific variable group
+    # All variables in fabric_common and fabric_dev are now usable as $(variable_name)
+  jobs:
+  - job: DeployWorkspace
+    displayName: 'Deploy Workspace in Dev'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - script: |
+        python -m pip install --upgrade pip
+        pip install ms-fabric-cli
+      displayName: 'Install Fabric CLI'
+    - script: |
+        fab auth login -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+      displayName: 'Fabric CLI Authentication'
+    - script: |
+        fab create $(workspace_name).Workspace -P capacityname=$(fabric_capacity_name)
+      displayName: 'Create Fabric Workspace'
+    - script: |
+        fab acl set $(workspace_name).Workspace -I $(workspace_admin_id) -R admin -f
+      displayName: 'Set Workspace Admin'
+
+# Repeat for test/prod
+- stage: DeployTest
+  displayName: 'Deploy Fabric Workspace to Test'
+  variables:
+    - name: environment
+      value: 'test'
+    - group: fabric_${{ variables.environment }}
+  jobs:
+  - job: DeployWorkspace
+    displayName: 'Deploy Workspace in Test'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - script: |
+        python -m pip install --upgrade pip
+        pip install ms-fabric-cli
+      displayName: 'Install Fabric CLI'
+    - script: |
+        fab auth login -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+      displayName: 'Fabric CLI Authentication'
+    - script: |
+        fab create $(workspace_name).Workspace -P capacityname=$(fabric_capacity_name)
+      displayName: 'Create Fabric Workspace'
+    - script: |
+        fab acl set $(workspace_name).Workspace -I $(workspace_admin_id) -R admin -f
+      displayName: 'Set Workspace Admin'
+
+- stage: DeployProd
+  displayName: 'Deploy Fabric Workspace to Prod'
+  variables:
+    - name: environment
+      value: 'prod'
+    - group: fabric_${{ variables.environment }}
+  jobs:
+  - job: DeployWorkspace
+    displayName: 'Deploy Workspace in Prod'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - script: |
+        python -m pip install --upgrade pip
+        pip install ms-fabric-cli
+      displayName: 'Install Fabric CLI'
+    - script: |
+        fab auth login -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+      displayName: 'Fabric CLI Authentication'
+    - script: |
+        fab create $(workspace_name).Workspace -P capacityname=$(fabric_capacity_name)
+      displayName: 'Create Fabric Workspace'
+    - script: |
+        fab acl set $(workspace_name).Workspace -I $(workspace_admin_id) -R admin -f
+      displayName: 'Set Workspace Admin'
