@@ -96,3 +96,19 @@ Try {
     Write-Host "Failed when setting permissions: $_"
 }
 
+
+
+
+# Set variables (copy/paste/adapt for your app)
+export APP_OBJECT_ID="<your-app-object-id>"
+export POWERBI_API_ID="00000009-0000-0000-c000-000000000000"
+export PERMISSION_ID_WORKSPACE_RW="9b29c84f-44fb-4b1c-8186-963b4f4f2ea6"
+
+# Add delegated permission Workspace.ReadWrite.All to your app
+az ad app permission add --id $APP_OBJECT_ID --api $POWERBI_API_ID --api-permissions $PERMISSION_ID_WORKSPACE_RW=Scope
+
+# List all permissions assigned to your app to verify it was added
+az ad app permission list --id $APP_OBJECT_ID
+
+# (Optional) Attempt to grant admin consent for all permissions (may require elevated privileges)
+az ad app permission grant --id $APP_OBJECT_ID --api $POWERBI_API_ID
