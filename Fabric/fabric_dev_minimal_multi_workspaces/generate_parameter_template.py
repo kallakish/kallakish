@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 """
-Generate parameter.yml for a Fabric workspace repo folder.
-
-Works with both layouts:
-  A) Classic: <root>/items/**/*
-  B) Git-integration: <root>/{Pipelines,Notebooks,Reports,Lakehouses,...}/**/*
-
-Finds GUID references in JSON files (pipeline-content.json, definition.json, *.ipynb)
-and best-effort in notebook-content.py (regex). Produces parameter.yml where:
-  - workspaceId is mapped to $workspace.$id
-  - other ids keep DEV value and add TEST/PROD placeholders
-  - connection secrets map to $env:* placeholders (you supply via pipeline env vars)
+Generate parameter.yml for a Fabric workspace repo folder (Git-integration or classic).
+This version coerces all values into YAML-safe types to avoid RepresenterError.
 
 Usage:
   python generate_parameter_template.py \
@@ -18,10 +9,10 @@ Usage:
       --workspace-root <path-to-workspace-folder> \
       --output parameter.yml
 """
-
 import argparse, json, os, re
 from pathlib import Path
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
+from typing import Any
 
 try:
     import yaml
@@ -30,29 +21,23 @@ except Exception:
 
 GUID_RE = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\b")
 
-# JSON keys we treat as "external id references"
 ID_KEYS = {
-    "lakehouseId", "warehouseId", "kqlDatabaseId",
-    "semanticModelId", "modelId", "datasetId",
-    "workspaceId", "connectionId", "sourceId"
+    "lakehouseId","warehouseId","kqlDatabaseId",
+    "semanticModelId","modelId","datasetId",
+    "workspaceId","connectionId","sourceId"
 }
-
-# Connection fields
 CONNECTION_PUBLIC = {"server","database","url","endpoint","account","container","fileSystem","scope","resourceId"}
 CONNECTION_SECRET = {"password","sas","sasToken","secret","clientSecret","sharedKey","connectionString"}
 
 def infer_item_type(path: Path) -> str | None:
-    n = path.name
-    # prefer the folder that ends with .<Type>
-    for parent in [path] + list(path.parents):
-        name = parent.name
-        if name.endswith(".DataPipeline"): return "DataPipeline"
-        if name.endswith(".Notebook"):     return "Notebook"
-        if name.endswith(".Lakehouse"):    return "Lakehouse"
-        if name.endswith(".SemanticModel"):return "SemanticModel"
-        if name.endswith(".Report"):       return "Report"
-        if name.endswith(".Warehouse"):    return "Warehouse"
-        if name.endswith(".Connection"):   return "Connection"
+    s = str(path)
+    if ".DataPipeline" in s: return "DataPipeline"
+    if ".Notebook"     in s: return "Notebook"
+    if ".Lakehouse"    in s: return "Lakehouse"
+    if ".SemanticModel"in s: return "SemanticModel"
+    if ".Report"       in s: return "Report"
+    if ".Warehouse"    in s: return "Warehouse"
+    if ".Connection"   in s: return "Connection"
     return None
 
 def load_json(path: Path):
@@ -64,42 +49,28 @@ def load_json(path: Path):
 def collect_from_json(obj, item_type: str, refs, conn_fields):
     if isinstance(obj, dict):
         for k, v in obj.items():
-            # IDs
             if k in ID_KEYS and isinstance(v, str) and GUID_RE.fullmatch(v or ""):
-                refs[(k, v, item_type)] += 1
-            # connection details block
+                refs[(k, v, item_type or "Notebook")] += 1
             if k == "connectionDetails" and isinstance(v, dict):
                 for ck, cv in v.items():
                     if isinstance(cv, str) and cv:
-                        if ck in CONNECTION_PUBLIC:
-                            conn_fields[("public", ck, cv)] += 1
-                        if ck in CONNECTION_SECRET:
-                            conn_fields[("secret", ck, cv)] += 1
-            # recurse
+                        if ck in CONNECTION_PUBLIC: conn_fields[("public", ck, cv)] += 1
+                        if ck in CONNECTION_SECRET: conn_fields[("secret", ck, cv)] += 1
             collect_from_json(v, item_type, refs, conn_fields)
     elif isinstance(obj, list):
         for it in obj:
             collect_from_json(it, item_type, refs, conn_fields)
 
 def collect_from_text(text: str, item_type: str, refs):
-    # best-effort: capture raw GUIDs inside .py notebooks
     for m in GUID_RE.finditer(text or ""):
         refs[("unknown", m.group(0), item_type or "Notebook")] += 1
 
 def scan_workspace(root: Path):
-    """
-    Returns (refs, conn_fields)
-    refs: map (json_key, guid, item_type) -> count
-    conn_fields: map (kind, field, value) -> count
-    """
     refs = defaultdict(int)
     conn_fields = defaultdict(int)
 
     candidates = []
-    # A) 'items' layout
-    if (root / "items").is_dir():
-        candidates.append(root / "items")
-    # B) Git integration layout (scan all)
+    if (root / "items").is_dir(): candidates.append(root / "items")
     candidates.append(root)
 
     seen = set()
@@ -111,76 +82,88 @@ def scan_workspace(root: Path):
 
             item_type = infer_item_type(p)
 
-            # JSON-bearing files we care about
             if p.name in ("pipeline-content.json","definition.json") or p.suffix.lower()==".ipynb":
                 obj = load_json(p)
                 if obj is not None:
                     collect_from_json(obj, item_type, refs, conn_fields)
                     continue
 
-            # best-effort for notebook-content.py or any .py inside a .Notebook folder
             if p.suffix.lower()==".py" and (".Notebook" in str(p.parent) or p.name=="notebook-content.py"):
                 try:
-                    text = p.read_text(encoding="utf-8", errors="ignore")
-                    collect_from_text(text, item_type, refs)
+                    collect_from_text(p.read_text(encoding="utf-8", errors="ignore"), item_type, refs)
                 except Exception:
                     pass
 
     return refs, conn_fields
 
-def build_parameter_yaml(dev_ws_id: str, refs, conn_fields):
-    param = OrderedDict()
-    param["find_replace"] = []
+def yamlify(obj: Any) -> Any:
+    """Coerce to YAML-friendly primitives: dict/list/str/int/float/bool/None."""
+    from collections import OrderedDict, defaultdict
+    if isinstance(obj, (str,int,float,bool)) or obj is None:
+        return obj
+    if isinstance(obj, Path):
+        return str(obj)
+    if isinstance(obj, (list, tuple, set)):
+        return [yamlify(x) for x in obj]
+    if isinstance(obj, (dict, OrderedDict, defaultdict)):
+        # YAML requires string keys; coerce everything to str keys
+        return {str(k): yamlify(v) for k, v in obj.items()}
+    # fallback to string
+    return str(obj)
 
-    # Always map workspace id to $workspace.$id (for common types)
+def build_parameter_yaml(dev_ws_id: str, refs, conn_fields):
+    fr: list[dict] = []
+
+    # Map workspace id -> $workspace.$id
     for t in ["Notebook","DataPipeline","SemanticModel","Report"]:
-        entry = OrderedDict()
-        entry["find_value"] = dev_ws_id
-        entry["replace_value"] = OrderedDict([("DEV","$workspace.$id"),("TEST","$workspace.$id"),("PROD","$workspace.$id")])
-        entry["item_type"] = t
-        param["find_replace"].append(entry)
+        fr.append({
+            "find_value": dev_ws_id,
+            "replace_value": {"DEV":"$workspace.$id","TEST":"$workspace.$id","PROD":"$workspace.$id"},
+            "item_type": t
+        })
 
     # Other GUIDs
-    for (k, guid, item_type), _cnt in sorted(refs.items(), key=lambda x: (x[0][2] or "", x[0][0] or "", x[0][1])):
-        if k == "workspaceId":  # already handled
+    for (k, guid, item_type), _cnt in sorted(refs.items(), key=lambda x: (x[0][2], x[0][0] or "", x[0][1])):
+        if k == "workspaceId":
             continue
-        entry = OrderedDict()
-        entry["find_value"] = guid
-        entry["replace_value"] = OrderedDict([
-            ("DEV", guid),
-            ("TEST", f"TODO-REPLACE-{(k or 'ID').upper()}-TEST"),
-            ("PROD", f"TODO-REPLACE-{(k or 'ID').upper()}-PROD"),
-        ])
-        entry["item_type"] = item_type or "Notebook"
-        param["find_replace"].append(entry)
+        fr.append({
+            "find_value": guid,
+            "replace_value": {
+                "DEV":  guid,
+                "TEST": f"TODO-REPLACE-{(k or 'ID').upper()}-TEST",
+                "PROD": f"TODO-REPLACE-{(k or 'ID').upper()}-PROD",
+            },
+            "item_type": item_type or "Notebook",
+        })
 
     # Connection fields
     for (kind, field, value), _cnt in sorted(conn_fields.items()):
-        entry = OrderedDict()
-        entry["find_value"] = value
+        if not value: continue
         if kind == "public":
-            entry["replace_value"] = OrderedDict([
-                ("DEV", value),
-                ("TEST", f"TODO-REPLACE-{field.upper()}-TEST"),
-                ("PROD", f"TODO-REPLACE-{field.upper()}-PROD"),
-            ])
-        else:
-            # secrets pull from env at deploy time
+            replace = {
+                "DEV":  value,
+                "TEST": f"TODO-REPLACE-{field.upper()}-TEST",
+                "PROD": f"TODO-REPLACE-{field.upper()}-PROD",
+            }
+        else:  # secret
             var = field.upper()
-            entry["replace_value"] = OrderedDict([
-                ("DEV", f"$env:{var}_DEV"),
-                ("TEST", f"$env:{var}_TEST"),
-                ("PROD", f"$env:{var}_PROD"),
-            ])
-        entry["item_type"] = "Connection"
-        param["find_replace"].append(entry)
+            replace = {
+                "DEV":  f"$env:{var}_DEV",
+                "TEST": f"$env:{var}_TEST",
+                "PROD": f"$env:{var}_PROD",
+            }
+        fr.append({
+            "find_value": value,
+            "replace_value": replace,
+            "item_type": "Connection",
+        })
 
-    return param
+    return {"find_replace": fr}
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--workspace-id", required=True, help="DEV workspace GUID")
-    ap.add_argument("--workspace-root", required=True, help="Folder that contains Pipelines/, Notebooks/, etc. (or items/)")
+    ap.add_argument("--workspace-id", required=True)
+    ap.add_argument("--workspace-root", required=True)
     ap.add_argument("--output", default="parameter.yml")
     args = ap.parse_args()
 
@@ -195,12 +178,23 @@ def main():
     refs, conn_fields = scan_workspace(root)
     param = build_parameter_yaml(dev_ws_id, refs, conn_fields)
 
+    # Coerce everything before dump (prevents RepresenterError)
+    yaml_ready = yamlify(param)
+
     out = Path(args.output)
-    if not out.is_absolute():
-        out = root / out
+    if not out.is_absolute(): out = root / out
     out.parent.mkdir(parents=True, exist_ok=True)
+
+    # Optional: validate each entry to catch the exact offender (debug aid)
+    for i, entry in enumerate(yaml_ready.get("find_replace", []), 1):
+        try:
+            yaml.safe_dump(entry)
+        except Exception as e:
+            print(f"[ERROR] YAML cannot represent find_replace entry #{i}: {entry}\n{e}")
+            raise
+
     with out.open("w", encoding="utf-8") as fh:
-        yaml.safe_dump(param, fh, sort_keys=False, allow_unicode=True)
+        yaml.safe_dump(yaml_ready, fh, sort_keys=False, allow_unicode=True)
 
     print(f"[OK] parameter.yml written: {out}")
     print(f"##vso[task.setvariable variable=fabric_parameter_file]{out}")
