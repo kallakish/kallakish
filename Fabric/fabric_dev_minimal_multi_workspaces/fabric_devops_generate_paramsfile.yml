@@ -11,3 +11,14 @@
       --workspace-root workspaces/workspace_alpha ^
       --output parameter.yml
   displayName: 'Generate parameter.yml (DEV template)'
+
+
+  - powershell: |
+    cd "$(Build.SourcesDirectory)"
+    git config user.email "pipelines@devops"
+    git config user.name  "Azure Pipelines"
+    git status
+    git add workspaces/mdf/parameter.yml
+    git commit -m "Add/update parameter.yml (auto-generated)" 2>$null || echo "No changes to commit"
+    git push origin HEAD:$(Build.SourceBranch)
+  displayName: 'Commit parameter.yml to repo'
