@@ -1,0 +1,13 @@
+# install PyYAML (and anything else you want)
+- script: |
+    "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
+    "C:/Program Files/Python312/python.exe" -m pip install pyyaml
+  displayName: 'Install generator deps'
+
+# generate parameter.yml from DEV repo contents
+- script: |
+    "C:/Program Files/Python312/python.exe" azure-pipelines/.deploy/generate_parameter_template.py ^
+      --workspace-id $(workspace_id_clean) ^
+      --workspace-root workspaces/workspace_alpha ^
+      --output parameter.yml
+  displayName: 'Generate parameter.yml (DEV template)'
