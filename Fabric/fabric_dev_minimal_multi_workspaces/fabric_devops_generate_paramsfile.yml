@@ -24,60 +24,38 @@
   displayName: 'Commit parameter.yml to repo'
 
 
+trigger: none
 
-
-trigger:
-- main
-
-# Variable groups you already have
 variables:
-- group: Fabric-Secrets     # FABRIC_CLIENT_ID, FABRIC_TENANT_ID, FABRIC_CLIENT_SECRET
-- group: fabric_common      # FABRIC_WORKSPACE_ID_DEV (etc.)
+- group: fabric_common   # must contain FABRIC_WORKSPACE_ID_DEV
 
 pool:
-  name: Default   # your Windows agent
+  name: Default  # Windows agent
 
 steps:
-# Make sure we can push back to the same branch
 - checkout: self
   persistCredentials: true
 
-# -----------------------------------------------------------------------------
-# Install shared Python deps (preflight + generator + deploy)
-# -----------------------------------------------------------------------------
+# Install the one dependency the generator needs
 - script: |
     "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
-    "C:/Program Files/Python312/python.exe" -m pip install msal pyjwt requests pyyaml fabric-cicd==0.1.30
-  displayName: 'Install Python packages'
+    "C:/Program Files/Python312/python.exe" -m pip install pyyaml
+  displayName: 'Install PyYAML'
 
-# -----------------------------------------------------------------------------
-# Preflight: prove token/tenant and workspace API access (sets $(workspace_id_clean))
-# -----------------------------------------------------------------------------
-- script: |
-    "C:/Program Files/Python312/python.exe" azure-pipelines/.deploy/pbi_access_preflight.py --workspace-id $(FABRIC_WORKSPACE_ID_DEV) --refresh
-  displayName: 'Preflight: token & Power BI access'
-  env:
-    FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
-    FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
-    FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
-
-# -----------------------------------------------------------------------------
-# Generate parameter file into workspace/parameter_files/parameter_gen_dev.yml
-# -----------------------------------------------------------------------------
+# Generate the file at workspace/parameter_files/parameter_gen_dev.yml
 - powershell: |
-    $WS_ROOT = "$(Build.SourcesDirectory)/workspace"   # <-- change if your workspace folder is different
+    $WS_ROOT = "$(Build.SourcesDirectory)/workspace"   # <--- change if your workspace folder is different
     $OUT     = "$(Build.SourcesDirectory)/workspace/parameter_files/parameter_gen_dev.yml"
 
-    # Create parent folder (generator will too, but this makes the log clearer)
     New-Item -ItemType Directory -Force -Path (Split-Path $OUT) | Out-Null
 
     "C:/Program Files/Python312/python.exe" `
       "azure-pipelines/.deploy/generate_parameter_template.py" `
-      --workspace-id "$(workspace_id_clean)" `
+      --workspace-id "$(FABRIC_WORKSPACE_ID_DEV)" `
       --workspace-root "$WS_ROOT" `
       --output "$OUT"
 
-    Write-Host "Generated file path: $OUT"
+    Write-Host "Generated: $OUT"
     if (Test-Path "$OUT") {
       Get-Content "$OUT" -Raw | Write-Host
     } else {
@@ -86,21 +64,11 @@ steps:
     }
   displayName: 'Generate parameter_gen_dev.yml'
 
-# Publish the generated file so you can download it from the run
-- task: PublishPipelineArtifact@1
-  displayName: 'Publish parameter_gen_dev.yml'
-  inputs:
-    targetPath: '$(Build.SourcesDirectory)/workspace/parameter_files/parameter_gen_dev.yml'
-    artifact: 'fabric-parameter-dev'
-
-# -----------------------------------------------------------------------------
-# Commit the generated file back to the repo (PowerShell 5.1 safe; no ||)
-# -----------------------------------------------------------------------------
+# Commit and push the generated file back to the repo (PowerShell 5.1-safe)
 - task: PowerShell@2
   displayName: 'Commit parameter_gen_dev.yml to repo'
   inputs:
     targetType: inline
-    # pwsh: false  # (default) Windows PowerShell
     script: |
       Set-StrictMode -Version Latest
       $ErrorActionPreference = 'Stop'
@@ -120,34 +88,3 @@ steps:
 
       git commit -m "Add/update parameter_gen_dev.yml (auto-generated)"
       git push origin HEAD:"$(Build.SourceBranch)"
-
-# -----------------------------------------------------------------------------
-# Copy parameter_gen_dev.yml -> workspace/parameter.yml (name expected by fabric-cicd)
-# -----------------------------------------------------------------------------
-- powershell: |
-    Copy-Item -Force `
-      "$(Build.SourcesDirectory)/workspace/parameter_files/parameter_gen_dev.yml" `
-      "$(Build.SourcesDirectory)/workspace/parameter.yml"
-    Write-Host "parameter.yml ready at $(Build.SourcesDirectory)/workspace/parameter.yml"
-  displayName: 'Prepare parameter.yml for deploy'
-
-# -----------------------------------------------------------------------------
-# Deploy content to DEV using the cleaned workspace id (from preflight)
-# -----------------------------------------------------------------------------
-- script: |
-    "C:/Program Files/Python312/python.exe" azure-pipelines/.deploy/deploy.py ^
-      --workspace-id $(workspace_id_clean) ^
-      --environment DEV ^
-      --repo-dir "$(Build.SourcesDirectory)/workspace"
-  displayName: 'Deploy to Fabric Workspace (DEV)'
-  env:
-    # Auth for DefaultAzureCredential (fabric-cicd)
-    AZURE_CLIENT_ID: $(FABRIC_CLIENT_ID)
-    AZURE_TENANT_ID: $(FABRIC_TENANT_ID)
-    AZURE_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
-    SYSTEM_DEBUG: true
-
-    # Example secrets consumed by parameter.yml (customize as needed)
-    SQL_USER_DEV: $(SQL_USER_DEV)
-    SQL_PASSWORD_DEV: $(SQL_PASSWORD_DEV)
-    STORAGE_SAS_DEV: $(STORAGE_SAS_DEV)
