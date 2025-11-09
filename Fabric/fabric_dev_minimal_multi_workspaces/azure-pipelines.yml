@@ -125,3 +125,44 @@ steps:
     FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
     FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
 
+
+
+#=====================================================================================
+
+
+
+
+# Install deps (preflight + deploy)
+- script: |
+    "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
+    "C:/Program Files/Python312/python.exe" -m pip install msal pyjwt requests fabric-cicd==0.1.30
+  displayName: 'Install packages'
+
+# Preflight: proves API access and sets $(workspace_id_clean)
+- script: |
+    "C:/Program Files/Python312/python.exe" azure-pipelines/.deploy/pbi_access_preflight.py --workspace-id $(FABRIC_WORKSPACE_ID_DEV) --refresh
+  displayName: 'Preflight: token & PBI access'
+  env:
+    FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+    FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+    FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+
+# Deploy: uses AZURE_* so fabric-cicd authenticates as the same SPN
+- script: |
+    "C:/Program Files/Python312/python.exe" azure-pipelines/.deploy/deploy.py ^
+      --workspace-id $(workspace_id_clean) ^
+      --environment DEV ^
+      --repo-dir workspaces/workspace_alpha/fabric_items
+  displayName: 'Deploy to Fabric Workspace (fabric-cicd)'
+  env:
+    # If your deploy.py or other libs read FABRIC_*, keep them too
+    FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+    FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+    FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+    # Critical for DefaultAzureCredential:
+    AZURE_CLIENT_ID: $(FABRIC_CLIENT_ID)
+    AZURE_TENANT_ID: $(FABRIC_TENANT_ID)
+    AZURE_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+    SYSTEM_DEBUG: true
+
+
