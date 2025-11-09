@@ -97,3 +97,31 @@ steps:
     FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
     FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
     FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+
+
+
+
+# Install deps once (msal, pyjwt, requests)
+- script: |
+    "C:/Program Files/Python312/python.exe" -m pip install --upgrade pip
+    "C:/Program Files/Python312/python.exe" -m pip install msal pyjwt requests
+  displayName: 'Install preflight deps'
+
+# Run the preflight; it will set $(workspace_id_clean) for later steps
+- script: |
+    "C:/Program Files/Python312/python.exe" azure-pipelines/.deploy/pbi_access_preflight.py --workspace-id $(FABRIC_WORKSPACE_ID_DEV) --refresh
+  displayName: 'Preflight: token & PBI access'
+  env:
+    FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+    FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+    FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+
+# Use the cleaned ID in your deploy
+- script: |
+    "C:/Program Files/Python312/python.exe" deploy.py --workspace-id $(workspace_id_clean) --environment DEV --repo-dir workspaces/workspace_alpha/fabric_items
+  displayName: 'Deploy to Fabric Workspace'
+  env:
+    FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+    FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+    FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+
