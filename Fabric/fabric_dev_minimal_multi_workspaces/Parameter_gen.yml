@@ -1,0 +1,69 @@
+# parameter.yml — per-pipeline connection swaps (4 envs)
+
+key_value_replace:
+  # ----------------------------
+  # Pipeline 1  (SQL): connectionname_conn_athena_SQL
+  # ----------------------------
+  - find_key: $.properties.activities[*].typeProperties.source.datasetSettings.externalReferences.connection
+    replace_value:
+      dev:  "ATHENA_SQL_DEV_CONNECTION_GUID"
+      test: "ATHENA_SQL_TEST_CONNECTION_GUID"
+      uat:  "ATHENA_SQL_UAT_CONNECTION_GUID"
+      prod: "ATHENA_SQL_PROD_CONNECTION_GUID"
+    item_type: "DataPipeline"
+    item_name: "pipeline1"          # <- exact pipeline display name
+
+  - find_key: $.properties.activities[*].typeProperties.sink.datasetSettings.externalReferences.connection
+    replace_value:
+      dev:  "ATHENA_SQL_DEV_CONNECTION_GUID"
+      test: "ATHENA_SQL_TEST_CONNECTION_GUID"
+      uat:  "ATHENA_SQL_UAT_CONNECTION_GUID"
+      prod: "ATHENA_SQL_PROD_CONNECTION_GUID"
+    item_type: "DataPipeline"
+    item_name: "pipeline1"
+
+  # ----------------------------
+  # Pipeline 2  (Oracle): Conn_A4E_Oralce
+  # ----------------------------
+  - find_key: $.properties.activities[*].typeProperties.source.datasetSettings.externalReferences.connection
+    replace_value:
+      dev:  "A4E_ORACLE_DEV_CONNECTION_GUID"
+      test: "A4E_ORACLE_TEST_CONNECTION_GUID"
+      uat:  "A4E_ORACLE_UAT_CONNECTION_GUID"
+      prod: "A4E_ORACLE_PROD_CONNECTION_GUID"
+    item_type: "DataPipeline"
+    item_name: "pipeline2"
+
+  - find_key: $.properties.activities[*].typeProperties.sink.datasetSettings.externalReferences.connection
+    replace_value:
+      dev:  "A4E_ORACLE_DEV_CONNECTION_GUID"
+      test: "A4E_ORACLE_TEST_CONNECTION_GUID"
+      uat:  "A4E_ORACLE_UAT_CONNECTION_GUID"
+      prod: "A4E_ORACLE_PROD_CONNECTION_GUID"
+    item_type: "DataPipeline"
+    item_name: "pipeline2"
+
+  # ----------------------------
+  # Pipeline 3  (Lakehouse in another workspace): Conn_Lakehouse
+  # ----------------------------
+  - find_key: $.properties.activities[*].typeProperties.source.datasetSettings.externalReferences.connection
+    replace_value:
+      dev:  "LAKEHOUSE_DEV_CONNECTION_GUID"
+      test: "LAKEHOUSE_TEST_CONNECTION_GUID"
+      uat:  "LAKEHOUSE_UAT_CONNECTION_GUID"
+      prod: "LAKEHOUSE_PROD_CONNECTION_GUID"
+    item_type: "DataPipeline"
+    item_name: "pipeline3"
+
+  - find_key: $.properties.activities[*].typeProperties.sink.datasetSettings.externalReferences.connection
+    replace_value:
+      dev:  "LAKEHOUSE_DEV_CONNECTION_GUID"
+      test: "LAKEHOUSE_TEST_CONNECTION_GUID"
+      uat:  "LAKEHOUSE_UAT_CONNECTION_GUID"
+      prod: "LAKEHOUSE_PROD_CONNECTION_GUID"
+    item_type: "DataPipeline"
+    item_name: "pipeline3"
+
+# If you don't need sinks (e.g., only source uses a connection), delete that rule block for that pipeline.
+
+find_replace: []
