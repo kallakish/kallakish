@@ -1,121 +1,235 @@
+# Triggers only when main changes, and only if relevant paths changed
+trigger:
+  branches: { include: [ main ] }
+  paths:
+    include:
+      - factory/*
+      - azure-piplines/parameters/*
+      - arm-template-parameters-definition.json
 
-# Do not trigger on Infra-Repo changes (optional). We’ll trigger off ADF repo.
-trigger: none
 pr: none
 
-resources:
-  repositories:
-    - repository: adfRepo
-      type: git
-      name: Project/ADF-Repo      # <Project>/<RepoName>
-      ref: refs/heads/master
-      trigger:
-        branches:
-          include:
-            - master
-        paths:
-          include:
-            - adf_publish/*        # only run when ADF publishes/changes
-            # add more paths if needed
-
 variables:
-  serviceConnection: 'AZURE_SVC_CONN'
+  serviceConnection: 'AZURE_SVC_CONN' # Azure RM service connection name
+  # ADF resource ID used for validate/export (point at DEV factory)
+  factoryResourceId: '/subscriptions/<SUB-ID-DEV>/resourceGroups/<RG-DEV>/providers/Microsoft.DataFactory/factories/<ADF-DEV-NAME>'
 
 stages:
+# ===== Build: validate + export (auto-publish) =====
+- stage: Build_ARM
+  displayName: Build (validate + export from /factory)
+  jobs:
+  - job: BuildExport
+    pool: { vmImage: 'ubuntu-latest' }
+    steps:
+    - checkout: self
+      clean: true
+
+    - task: UseNode@1
+      displayName: Use Node.js 20
+      inputs: { version: '20.x' }
+
+    - task: Npm@1
+      displayName: Install ADF utilities
+      inputs:
+        command: 'ci'
+        workingDir: '$(Build.SourcesDirectory)'
+
+    # Validate authored JSON in /factory against your DEV ADF (schemas)
+    - task: Npm@1
+      displayName: Validate ADF
+      inputs:
+        command: 'custom'
+        workingDir: '$(Build.SourcesDirectory)'
+        customCommand: >
+          run adf validate $(Build.SourcesDirectory)/factory $(factoryResourceId)
+
+    # Export == publish → produces ARMTemplateForFactory.json (+ params)
+    - task: Npm@1
+      displayName: Export ARM (auto-publish)
+      inputs:
+        command: 'custom'
+        workingDir: '$(Build.SourcesDirectory)'
+        customCommand: >
+          run adf export $(Build.SourcesDirectory)/factory $(factoryResourceId) ArmTemplate
+
+    - task: PublishPipelineArtifact@1
+      displayName: Publish ARM artifact
+      inputs:
+        targetPath: '$(Build.SourcesDirectory)/ArmTemplate'
+        artifact: 'ArmTemplates'
+        publishLocation: 'pipeline'
+
+# ===== DEV =====
 - stage: Dev
   displayName: Deploy to DEV
+  dependsOn: Build_ARM
   variables:
     subscriptionId: '<SUBSCRIPTION-ID-DEV>'
-    resourceGroup:  'rg-data-dev'
-    adfName:        'adf-dev-ukwe'
+    resourceGroup:  '<RG-DEV>'
     location:       'westeurope'
-    # parameters live in Infra-Repo:
-    paramFile:      'pipelines/parameters/adf.dev.parameters.json'
+    paramFile:      'azure-piplines/parameters/adf.dev.parameters.json'
   jobs:
   - job: DeployDev
-    pool:
-      vmImage: 'windows-latest'
+    pool: { vmImage: 'windows-latest' }
     steps:
-      # Checkout ADF repo (with the ARM template)
-      - checkout: adfRepo
-      # Checkout Infra-Repo (self) for parameter files and scripts
-      - checkout: self
+    - checkout: self
+    - download: current
+      artifact: ArmTemplates
 
-      - task: AzurePowerShell@5
-        displayName: Stop ADF triggers (DEV)
-        inputs:
-          azureSubscription: $(serviceConnection)
-          ScriptType: InlineScript
-          Inline: |
-            if (-not (Get-Module -ListAvailable Az.DataFactory)) { Install-Module Az.DataFactory -Force -Scope CurrentUser }
-            Import-Module Az.DataFactory -Force
-            $triggers = Get-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName "$(adfName)" -ErrorAction SilentlyContinue
-            if ($triggers) {
-              $triggers | Where-Object { $_.RuntimeState -eq 'Started' } |
-                ForEach-Object { Stop-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName "$(adfName)" -Name $_.Name -Force }
-            }
-          azurePowerShellVersion: LatestVersion
+    - task: AzurePowerShell@5
+      displayName: Stop ADF triggers (DEV)
+      inputs:
+        azureSubscription: $(serviceConnection)
+        ScriptType: InlineScript
+        Inline: |
+          Import-Module Az.DataFactory -Force
+          $df = Get-AzDataFactoryV2 -ResourceGroupName "$(resourceGroup)"
+          $ts = Get-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName $df.Name -ErrorAction SilentlyContinue
+          if ($ts) { $ts | Where-Object RuntimeState -eq 'Started' | ForEach-Object {
+            Stop-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName $df.Name -Name $_.Name -Force } }
+        azurePowerShellVersion: LatestVersion
 
-      - task: AzureResourceManagerTemplateDeployment@3
-        displayName: ARM template deployment (DEV)
-        inputs:
-          deploymentScope: 'Resource Group'
-          azureResourceManagerConnection: $(serviceConnection)
-          subscriptionId: $(subscriptionId)
-          action: 'Create Or Update Resource Group'
-          resourceGroupName: $(resourceGroup)
-          location: $(location)
-          templateLocation: 'Linked artifact'
-          # NOTE: ARM template path comes from the ADF repo (alias = adfRepo)
-          csmFile: '$(Build.SourcesDirectory)/adfRepo/adf_publish/arm_template.json'
-          # Param file from Infra-Repo (self)
-          csmParametersFile: '$(Build.SourcesDirectory)/pipelines/parameters/adf.dev.parameters.json'
-          deploymentMode: 'Incremental'
+    - task: AzureResourceManagerTemplateDeployment@3
+      displayName: ARM deploy (DEV)
+      inputs:
+        deploymentScope: 'Resource Group'
+        azureResourceManagerConnection: $(serviceConnection)
+        subscriptionId: $(subscriptionId)
+        action: 'Create Or Update Resource Group'
+        resourceGroupName: $(resourceGroup)
+        location: $(location)
+        templateLocation: 'Linked artifact'
+        csmFile: '$(Pipeline.Workspace)/ArmTemplates/ARMTemplateForFactory.json'
+        # Use your curated per-env parameters:
+        csmParametersFile: '$(Build.SourcesDirectory)/$(paramFile)'
+        deploymentMode: 'Incremental'
 
-      - task: AzurePowerShell@5
-        displayName: Start ADF triggers (DEV)
-        inputs:
-          azureSubscription: $(serviceConnection)
-          ScriptType: InlineScript
-          Inline: |
-            if (-not (Get-Module -ListAvailable Az.DataFactory)) { Install-Module Az.DataFactory -Force -Scope CurrentUser }
-            Import-Module Az.DataFactory -Force
-            $triggers = Get-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName "$(adfName)" -ErrorAction SilentlyContinue
-            if ($triggers) {
-              $triggers | Where-Object { $_.RuntimeState -ne 'Started' } |
-                ForEach-Object { Start-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName "$(adfName)" -Name $_.Name -Force }
-            }
-          azurePowerShellVersion: LatestVersion
+    - task: AzurePowerShell@5
+      displayName: Start ADF triggers (DEV)
+      inputs:
+        azureSubscription: $(serviceConnection)
+        ScriptType: InlineScript
+        Inline: |
+          Import-Module Az.DataFactory -Force
+          $df = Get-AzDataFactoryV2 -ResourceGroupName "$(resourceGroup)"
+          $ts = Get-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName $df.Name -ErrorAction SilentlyContinue
+          if ($ts) { $ts | Where-Object RuntimeState -ne 'Started' | ForEach-Object {
+            Start-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName $df.Name -Name $_.Name -Force } }
+        azurePowerShellVersion: LatestVersion
 
-# Repeat Test/Prod stages exactly like before, reusing the same two checkouts
-# and switching paramFile/subscriptionId/resourceGroup/adfName/location
+# ===== TEST =====
+- stage: Test
+  displayName: Deploy to TEST
+  dependsOn: Dev
+  condition: succeeded()
+  variables:
+    subscriptionId: '<SUBSCRIPTION-ID-TEST>'
+    resourceGroup:  '<RG-TEST>'
+    location:       'westeurope'
+    paramFile:      'azure-piplines/parameters/adf.test.parameters.json'
+  jobs:
+  - job: DeployTest
+    pool: { vmImage: 'windows-latest' }
+    steps:
+    - checkout: self
+    - download: current
+      artifact: ArmTemplates
 
+    - task: AzurePowerShell@5
+      displayName: Stop ADF triggers (TEST)
+      inputs:
+        azureSubscription: $(serviceConnection)
+        ScriptType: InlineScript
+        Inline: |
+          Import-Module Az.DataFactory -Force
+          $df = Get-AzDataFactoryV2 -ResourceGroupName "$(resourceGroup)"
+          Get-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName $df.Name -ErrorAction SilentlyContinue |
+            Where-Object RuntimeState -eq 'Started' |
+            ForEach-Object { Stop-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName $df.Name -Name $_.Name -Force }
+        azurePowerShellVersion: LatestVersion
 
+    - task: AzureResourceManagerTemplateDeployment@3
+      displayName: ARM deploy (TEST)
+      inputs:
+        deploymentScope: 'Resource Group'
+        azureResourceManagerConnection: $(serviceConnection)
+        subscriptionId: $(subscriptionId)
+        action: 'Create Or Update Resource Group'
+        resourceGroupName: $(resourceGroup)
+        location: $(location)
+        templateLocation: 'Linked artifact'
+        csmFile: '$(Pipeline.Workspace)/ArmTemplates/ARMTemplateForFactory.json'
+        csmParametersFile: '$(Build.SourcesDirectory)/$(paramFile)'
+        deploymentMode: 'Incremental'
 
-your-repo/
-├─ adf_publish/                         # Generated by ADF "Publish"
-│  ├─ arm_template.json
-│  ├─ arm_template_parameters.json      # (auto-generated; rarely edited)
-│  └─ arm-template-parameters-definition.json  # controls what gets parameterized
-├─ pipelines/
-│  └─ parameters/
-│     ├─ adf.dev.parameters.json
-│     ├─ adf.test.parameters.json
-│     └─ adf.prod.parameters.json
-├─ scripts/                             # optional (stop/start triggers, helpers)
-│  └─ adf-triggers.ps1
-└─ azure-pipelines.yml
+    - task: AzurePowerShell@5
+      displayName: Start ADF triggers (TEST)
+      inputs:
+        azureSubscription: $(serviceConnection)
+        ScriptType: InlineScript
+        Inline: |
+          Import-Module Az.DataFactory -Force
+          $df = Get-AzDataFactoryV2 -ResourceGroupName "$(resourceGroup)"
+          Get-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName $df.Name -ErrorAction SilentlyContinue |
+            Where-Object RuntimeState -ne 'Started' |
+            ForEach-Object { Start-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName $df.Name -Name $_.Name -Force }
+        azurePowerShellVersion: LatestVersion
 
+# ===== PROD =====
+- stage: Prod
+  displayName: Deploy to PROD
+  dependsOn: Test
+  condition: succeeded()
+  variables:
+    subscriptionId: '<SUBSCRIPTION-ID-PROD>'
+    resourceGroup:  '<RG-PROD>'
+    location:       'westeurope'
+    paramFile:      'azure-piplines/parameters/adf.prod.parameters.json'
+  jobs:
+  - job: DeployProd
+    pool: { vmImage: 'windows-latest' }
+    steps:
+    - checkout: self
+    - download: current
+      artifact: ArmTemplates
 
-Infra-Repo/
-├─ pipelines/
-│  └─ parameters/
-│     ├─ adf.dev.parameters.json
-│     ├─ adf.test.parameters.json
-│     └─ adf.prod.parameters.json
-├─ scripts/
-│  └─ adf-triggers.ps1
-└─ azure-pipelines.yml
+    - task: AzurePowerShell@5
+      displayName: Stop ADF triggers (PROD)
+      inputs:
+        azureSubscription: $(serviceConnection)
+        ScriptType: InlineScript
+        Inline: |
+          Import-Module Az.DataFactory -Force
+          $df = Get-AzDataFactoryV2 -ResourceGroupName "$(resourceGroup)"
+          Get-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName $df.Name -ErrorAction SilentlyContinue |
+            Where-Object RuntimeState -eq 'Started' |
+            ForEach-Object { Stop-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName $df.Name -Name $_.Name -Force }
+        azurePowerShellVersion: LatestVersion
 
+    - task: AzureResourceManagerTemplateDeployment@3
+      displayName: ARM deploy (PROD)
+      inputs:
+        deploymentScope: 'Resource Group'
+        azureResourceManagerConnection: $(serviceConnection)
+        subscriptionId: $(subscriptionId)
+        action: 'Create Or Update Resource Group'
+        resourceGroupName: $(resourceGroup)
+        location: $(location)
+        templateLocation: 'Linked artifact'
+        csmFile: '$(Pipeline.Workspace)/ArmTemplates/ARMTemplateForFactory.json'
+        csmParametersFile: '$(Build.SourcesDirectory)/$(paramFile)'
+        deploymentMode: 'Incremental'
 
-
+    - task: AzurePowerShell@5
+      displayName: Start ADF triggers (PROD)
+      inputs:
+        azureSubscription: $(serviceConnection)
+        ScriptType: InlineScript
+        Inline: |
+          Import-Module Az.DataFactory -Force
+          $df = Get-AzDataFactoryV2 -ResourceGroupName "$(resourceGroup)"
+          Get-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName $df.Name -ErrorAction SilentlyContinue |
+            Where-Object RuntimeState -ne 'Started' |
+            ForEach-Object { Start-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName $df.Name -Name $_.Name -Force }
+        azurePowerShellVersion: LatestVersion
