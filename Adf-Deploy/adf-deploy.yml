@@ -1,0 +1,90 @@
+# Do not trigger on Infra-Repo changes (optional). We’ll trigger off ADF repo.
+trigger: none
+pr: none
+
+resources:
+  repositories:
+    - repository: adfRepo
+      type: git
+      name: Project/ADF-Repo      # <Project>/<RepoName>
+      ref: refs/heads/master
+      trigger:
+        branches:
+          include:
+            - master
+        paths:
+          include:
+            - adf_publish/*        # only run when ADF publishes/changes
+            # add more paths if needed
+
+variables:
+  serviceConnection: 'AZURE_SVC_CONN'
+
+stages:
+- stage: Dev
+  displayName: Deploy to DEV
+  variables:
+    subscriptionId: '<SUBSCRIPTION-ID-DEV>'
+    resourceGroup:  'rg-data-dev'
+    adfName:        'adf-dev-ukwe'
+    location:       'westeurope'
+    # parameters live in Infra-Repo:
+    paramFile:      'pipelines/parameters/adf.dev.parameters.json'
+  jobs:
+  - job: DeployDev
+    pool:
+      vmImage: 'windows-latest'
+    steps:
+      # Checkout ADF repo (with the ARM template)
+      - checkout: adfRepo
+      # Checkout Infra-Repo (self) for parameter files and scripts
+      - checkout: self
+
+      - task: AzurePowerShell@5
+        displayName: Stop ADF triggers (DEV)
+        inputs:
+          azureSubscription: $(serviceConnection)
+          ScriptType: InlineScript
+          Inline: |
+            if (-not (Get-Module -ListAvailable Az.DataFactory)) { Install-Module Az.DataFactory -Force -Scope CurrentUser }
+            Import-Module Az.DataFactory -Force
+            $triggers = Get-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName "$(adfName)" -ErrorAction SilentlyContinue
+            if ($triggers) {
+              $triggers | Where-Object { $_.RuntimeState -eq 'Started' } |
+                ForEach-Object { Stop-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName "$(adfName)" -Name $_.Name -Force }
+            }
+          azurePowerShellVersion: LatestVersion
+
+      - task: AzureResourceManagerTemplateDeployment@3
+        displayName: ARM template deployment (DEV)
+        inputs:
+          deploymentScope: 'Resource Group'
+          azureResourceManagerConnection: $(serviceConnection)
+          subscriptionId: $(subscriptionId)
+          action: 'Create Or Update Resource Group'
+          resourceGroupName: $(resourceGroup)
+          location: $(location)
+          templateLocation: 'Linked artifact'
+          # NOTE: ARM template path comes from the ADF repo (alias = adfRepo)
+          csmFile: '$(Build.SourcesDirectory)/adfRepo/adf_publish/arm_template.json'
+          # Param file from Infra-Repo (self)
+          csmParametersFile: '$(Build.SourcesDirectory)/pipelines/parameters/adf.dev.parameters.json'
+          deploymentMode: 'Incremental'
+
+      - task: AzurePowerShell@5
+        displayName: Start ADF triggers (DEV)
+        inputs:
+          azureSubscription: $(serviceConnection)
+          ScriptType: InlineScript
+          Inline: |
+            if (-not (Get-Module -ListAvailable Az.DataFactory)) { Install-Module Az.DataFactory -Force -Scope CurrentUser }
+            Import-Module Az.DataFactory -Force
+            $triggers = Get-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName "$(adfName)" -ErrorAction SilentlyContinue
+            if ($triggers) {
+              $triggers | Where-Object { $_.RuntimeState -ne 'Started' } |
+                ForEach-Object { Start-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName "$(adfName)" -Name $_.Name -Force }
+            }
+          azurePowerShellVersion: LatestVersion
+
+# Repeat Test/Prod stages exactly like before, reusing the same two checkouts
+# and switching paramFile/subscriptionId/resourceGroup/adfName/location
