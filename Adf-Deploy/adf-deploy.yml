@@ -233,3 +233,60 @@ stages:
             Where-Object RuntimeState -ne 'Started' |
             ForEach-Object { Start-AzDataFactoryV2Trigger -ResourceGroupName "$(resourceGroup)" -DataFactoryName $df.Name -Name $_.Name -Force }
         azurePowerShellVersion: LatestVersion
+
+
+
+
+
+        # 0) Download the build artifact to a deterministic path
+- task: DownloadPipelineArtifact@2
+  displayName: Download ArmTemplates artifact
+  inputs:
+    artifact: ArmTemplates
+    path: $(System.ArtifactsDirectory)
+
+# 1) Show what we got (helps diagnose paths/casing)
+- powershell: |
+    "ArtifactsDir: $(System.ArtifactsDirectory)"
+    Get-ChildItem -Recurse "$(System.ArtifactsDirectory)\ArmTemplates" | Select FullName
+  displayName: List ARM files
+
+# 2) Auto-discover the actual root template & parameters (handles casing)
+- powershell: |
+    $root = "$(System.ArtifactsDirectory)\ArmTemplates"
+    $arm = Get-ChildItem -Recurse $root -Filter *ARMTemplate*Factory*.json | Select-Object -First 1
+    if (-not $arm) { throw "ARM template not found under $root" }
+    $par = Get-ChildItem -Recurse $root -Filter *ARMTemplateParameters*Factory*.json | Select-Object -First 1
+    if (-not $par) { throw "Parameters file not found under $root" }
+    "Template: $($arm.FullName)"
+    "Params:   $($par.FullName)"
+    Write-Host "##vso[task.setvariable variable=armTemplate]$($arm.FullName)"
+    Write-Host "##vso[task.setvariable variable=armParams]$($par.FullName)"
+    Write-Host "##vso[task.setvariable variable=armDir]$($arm.DirectoryName)"
+  displayName: Find ARM files
+
+# 3) (Optional) normalize to UTF-8 (no BOM) — safe on Win/Linux agents
+- powershell: |
+    $files = @("$(armTemplate)", "$(armParams)")
+    foreach ($f in $files) {
+      $txt = Get-Content -Raw $f
+      $enc = New-Object System.Text.UTF8Encoding($false)
+      [System.IO.File]::WriteAllText($f, $txt, $enc)
+    }
+  displayName: Normalize encoding
+
+# 4) Deploy using Azure CLI (resolves linkedTemplates relative to the root)
+- task: AzureCLI@2
+  displayName: Deploy ADF (DEV) via az
+  inputs:
+    azureSubscription: $(serviceConnection)
+    scriptType: pscore
+    scriptLocation: inlineScript
+    workingDirectory: '$(armDir)'
+    inlineScript: |
+      az deployment group create `
+        --resource-group "$(resourceGroup)" `
+        --mode Incremental `
+        --template-file "$(armTemplate)" `
+        --parameters @"$(armParams)"
+
