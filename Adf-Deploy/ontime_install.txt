@@ -1,0 +1,8 @@
+
+
+# Trust PSGallery & ensure NuGet provider
+Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+
+# Install needed modules globally (fastest long-term)
+Install-Module Az.Accounts,Az.Resources,Az.DataFactory -Scope AllUsers -Force -AllowClobber
