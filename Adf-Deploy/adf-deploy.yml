@@ -290,3 +290,69 @@ stages:
         --template-file "$(armTemplate)" `
         --parameters @"$(armParams)"
 
+
+
+
+
+
+# 0) Download the build artifact that contains the exported ARM template(s)
+- task: DownloadPipelineArtifact@2
+  displayName: Download ArmTemplates artifact
+  inputs:
+    artifact: ArmTemplates
+    path: $(System.ArtifactsDirectory)
+
+# 1) Discover the template & params (params strictly from your branch)
+- task: PowerShell@2
+  displayName: Find ARM template + assert branch param file
+  inputs:
+    targetType: inline
+    pwsh: false
+    script: |
+      # Find the exported root template inside the artifact
+      $root = "$(System.ArtifactsDirectory)\ArmTemplates"
+      $arm = Get-ChildItem -Recurse $root -Filter *ARMTemplate*Factory*.json | Select-Object -First 1
+      if (-not $arm) { throw "ARM template not found under $root" }
+
+      # Use ONLY the param file from your branch (self checkout)
+      $branchParam = Join-Path "$(Build.SourcesDirectory)" "$(paramFile)"
+      if (-not (Test-Path $branchParam)) {
+        throw "Param file not found in branch: $branchParam"
+      }
+
+      "Template: $($arm.FullName)"
+      "Branch Params: $branchParam"
+      Write-Host "##vso[task.setvariable variable=armTemplate]$($arm.FullName)"
+      Write-Host "##vso[task.setvariable variable=armDir]$($arm.DirectoryName)"
+      Write-Host "##vso[task.setvariable variable=deployParams]$branchParam"
+
+# (optional) Normalize encoding (harmless)
+- task: PowerShell@2
+  displayName: Normalize encoding
+  inputs:
+    targetType: inline
+    pwsh: false
+    script: |
+      $files = @("$(armTemplate)", "$(deployParams)")
+      foreach ($f in $files) {
+        $txt = Get-Content -Raw $f
+        $enc = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText($f, $txt, $enc)
+      }
+
+# 2) Deploy using Azure CLI (robust with linkedTemplates)
+- task: AzureCLI@2
+  displayName: Deploy ADF via az
+  inputs:
+    azureSubscription: $(serviceConnection)
+    scriptType: ps                  # Windows PowerShell on your self-hosted agent
+    scriptLocation: inlineScript
+    workingDirectory: '$(armDir)'   # keep relative linkedTemplates working
+    inlineScript: |
+      az deployment group create `
+        --resource-group "$(resourceGroup)" `
+        --mode Incremental `
+        --template-file "$(armTemplate)" `
+        --parameters @"$(deployParams)"
+
+
