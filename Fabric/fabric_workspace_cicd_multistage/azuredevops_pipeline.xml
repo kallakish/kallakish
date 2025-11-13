@@ -116,3 +116,89 @@ stages:
         Write-Host "  - Ensuring admin ACL..."
         & $fabPath acl set "$name.Workspace" -I $admin -R admin -f
       }
+=====================================================================
+
+jobs:
+- job: DeployFabricWorkspaces
+  displayName: 'Deploy Fabric workspaces from config'
+  pool:
+    name: 'Azure PreProd Pipelines'  # Your self-hosted Windows agent pool
+
+  variables:
+  - name: environment
+    value: 'dev'
+  - group: fabric_$(environment)      # variable group: fabric_dev
+
+  steps:
+  # 1. Install Fabric CLI
+  - script: |
+      "C:\Program Files\Python312\python.exe" -m pip install --upgrade pip
+      "C:\Program Files\Python312\python.exe" -m pip install ms-fabric-cli
+    displayName: 'Install Fabric CLI'
+
+  # 2. Quick sanity check
+  - script: |
+      "C:\Program Files\Python312\Scripts\fab.exe" --version
+    displayName: 'Fab Version'
+
+  # 3. Authenticate Fabric CLI (Service Principal)
+  - script: |
+      "C:\Program Files\Python312\Scripts\fab.exe" auth login -u $(dev_client_id) -p $(dev_client_secret) --tenant $(tenant_id)
+    displayName: 'Fabric CLI Authentication'
+
+  # 4. Loop through workspaces.json and create/ACL each workspace
+  - task: PowerShell@2
+    displayName: 'Create Fabric workspaces for all sources from config'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $fabPath    = "C:\Program Files\Python312\Scripts\fab.exe"
+        $configPath = "$(Build.SourcesDirectory)\infra\workspaces.json"
+
+        Write-Host "Loading workspace config from $configPath"
+
+        if (-not (Test-Path $configPath)) {
+          throw "Config file not found: $configPath"
+        }
+
+        $json       = Get-Content $configPath -Raw
+        $workspaces = @(ConvertFrom-Json -InputObject $json)
+
+        foreach ($ws in $workspaces) {
+          $name = $ws.workspaceName
+          if (-not $name) {
+            Write-Warning "Skipping entry with no workspaceName"
+            continue
+          }
+
+          # Fallback to pipeline variables if values not present in JSON
+          $capacity = if ($ws.capacityName) { $ws.capacityName } else { "$(fabric_capacity_name)" }
+          $admin    = if ($ws.adminObjectId) { $ws.adminObjectId } else { "$(fabric_workspace_admin_id)" }
+
+          Write-Host "---------------------------------------------"
+          Write-Host "Processing workspace: $name (source = $($ws.source))"
+
+          # Check if workspace exists
+          & $fabPath exists "$name.Workspace"
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "  - Workspace already exists – skipping create."
+          }
+          else {
+            Write-Host "  - Workspace does not exist – creating..."
+            & $fabPath create "$name.Workspace" -P "capacityname=$capacity"
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to create workspace '$name'. Exit code: $LASTEXITCODE"
+            }
+          }
+
+          # Ensure admin ACL is set (idempotent)
+          Write-Host "  - Ensuring admin ACL..."
+          & $fabPath acl set "$name.Workspace" -I $admin -R admin -f
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to set admin ACL for workspace '$name'. Exit code: $LASTEXITCODE"
+          }
+        }
+
+        Write-Host "All workspaces from config processed successfully."
