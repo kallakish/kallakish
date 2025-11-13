@@ -1,0 +1,20 @@
+[
+  {
+    "source": "AthenaSQL",
+    "workspaceName": "fab-dev-athena-dataengg",
+    "capacityName": "DevCapacity",
+    "adminObjectId": "00000000-0000-0000-0000-000000000001"
+  },
+  {
+    "source": "OracleCRM",
+    "workspaceName": "fab-dev-oraclecrm-dataengg",
+    "capacityName": "DevCapacity",
+    "adminObjectId": "00000000-0000-0000-0000-000000000002"
+  },
+  {
+    "source": "SAP",
+    "workspaceName": "fab-dev-sap-dataengg",
+    "capacityName": "DevCapacity",
+    "adminObjectId": "00000000-0000-0000-0000-000000000003"
+  }
+]
