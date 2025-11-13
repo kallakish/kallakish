@@ -83,3 +83,36 @@ stages:
     - script: |
         fab acl set $(workspace_name).Workspace -I $(workspace_admin_id) -R admin -f
       displayName: 'Set Workspace Admin'
+
+
+- task: PowerShell@2
+  displayName: 'Create Fabric workspaces for all sources from config'
+  inputs:
+    targetType: 'inline'
+    script: |
+      $fabPath = "C:\Program Files\Python312\Scripts\fab.exe"
+      $configPath = "$(Build.SourcesDirectory)\infra\workspaces.json"
+
+      Write-Host "Loading workspace config from $configPath"
+      $workspaces = Get-Content $configPath | ConvertFrom-Json
+
+      foreach ($ws in $workspaces) {
+        $name     = $ws.workspaceName
+        $capacity = if ($ws.capacityName) { $ws.capacityName } else { "$(fabric_capacity_name)" }
+        $admin    = if ($ws.adminObjectId) { $ws.adminObjectId } else { "$(fabric_workspace_admin_id)" }
+
+        Write-Host "---------------------------------------------"
+        Write-Host "Processing workspace: $name (source = $($ws.source))"
+        
+        & $fabPath exists "$name.Workspace"
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "  - Workspace already exists – skipping create."
+        }
+        else {
+          Write-Host "  - Workspace does not exist – creating..."
+          & $fabPath create "$name.Workspace" -P "capacityname=$capacity"
+        }
+
+        Write-Host "  - Ensuring admin ACL..."
+        & $fabPath acl set "$name.Workspace" -I $admin -R admin -f
+      }
