@@ -356,3 +356,18 @@ stages:
         --parameters @"$(deployParams)"
 
 
+- task: AzureResourceManagerTemplateDeployment@3
+  displayName: ARM deploy (DEV)
+  inputs:
+    deploymentScope: 'Resource Group'
+    azureResourceManagerConnection: $(serviceConnection)
+    subscriptionId: $(subscriptionId)        # make sure this matches the svc connection’s sub
+    action: 'Create Or Update Resource Group'
+    resourceGroupName: $(resourceGroup)
+    location: $(location)
+    templateLocation: 'Linked artifact'
+    csmFile: '$(armTemplate)'                # from the artifact discovery step
+    csmParametersFile: '$(deployParams)'     # param file from YOUR branch
+    deploymentMode: 'Incremental'
+    deploymentName: 'adf-$(Build.BuildNumber)'
+
