@@ -308,3 +308,87 @@ jobs:
 
         Write-Host "All workspaces from config processed."
 
+Code with I :
+
+
+
+- task: PowerShell@2
+  displayName: 'Create Fabric workspaces for all sources from config'
+  inputs:
+    targetType: 'inline'
+    script: |
+      $ErrorActionPreference = 'Stop'
+
+      $fabPath    = "C:\Program Files\Python312\Scripts\fab.exe"
+      $configPath = "$(Build.SourcesDirectory)\infra\workspaces.json"
+      $envSuffix  = "$(environment)"   # e.g. dev / test / prod
+
+      Write-Host "Loading workspace config from $configPath"
+
+      if (-not (Test-Path $configPath)) {
+        throw "Config file not found: $configPath"
+      }
+
+      # Read JSON once and parse
+      $json       = Get-Content $configPath -Raw
+      $workspaces = ConvertFrom-Json -InputObject $json
+
+      # Force into array explicitly so indexing is safe
+      $workspaces = @($workspaces)
+
+      Write-Host "DEBUG: workspaces.Count = $($workspaces.Count)"
+
+      for ($i = 0; $i -lt $workspaces.Count; $i++) {
+        $ws = $workspaces[$i]
+
+        # Each $ws here is ONE object from the JSON array
+        $baseName = [string]$ws.workspaceName
+
+        if ([string]::IsNullOrWhiteSpace($baseName)) {
+          Write-Warning "Skipping entry [$i] with no workspaceName"
+          continue
+        }
+
+        # Build full workspace name: base + env suffix
+        $name     = "$baseName$envSuffix"
+        $capacity = [string]$ws.capacityName
+        $admin    = [string]$ws.adminObjectId
+
+        if ([string]::IsNullOrWhiteSpace($capacity)) {
+          throw "capacityName is missing in JSON for workspace '$baseName'"
+        }
+        if ([string]::IsNullOrWhiteSpace($admin)) {
+          throw "adminObjectId is missing in JSON for workspace '$baseName'"
+        }
+
+        Write-Host "---------------------------------------------"
+        Write-Host "Index       : $i"
+        Write-Host "source      : $($ws.source)"
+        Write-Host "baseName    : '$baseName'"
+        Write-Host "fullName    : '$name'"
+        Write-Host "capacity    : $capacity"
+        Write-Host "adminObject : $admin"
+
+        # Check if workspace exists
+        & $fabPath exists "$name.Workspace"
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "  - Workspace '$name' already exists – skipping create and ACL."
+        }
+        else {
+          Write-Host "  - Workspace '$name' does not exist – creating..."
+          & $fabPath create "$name.Workspace" -P "capacityname=$capacity"
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to create workspace '$name'. Exit code: $LASTEXITCODE"
+          }
+
+          Write-Host "  - Setting admin ACL for new workspace..."
+          & $fabPath acl set "$name.Workspace" -I $admin -R admin -f
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to set admin ACL for workspace '$name'. Exit code: $LASTEXITCODE"
+          }
+        }
+      }
+
+      Write-Host "All workspaces from config processed."
