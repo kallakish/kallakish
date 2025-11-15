@@ -262,6 +262,10 @@ jobs:
         }
 
         Write-Host "Found $($workspaces.Count) workspace entries in config."
+        $workspaceNames = @($workspaces.workspaceName)
+        
+        Write-Host "DEBUG: workspaceNames type = $($workspaceNames.GetType().FullName)"
+        Write-Host "DEBUG: workspaceNames = $($workspaceNames -join ', ')"
 
         foreach ($ws in $workspaces) {
           $baseName = [string]$ws.workspaceName
