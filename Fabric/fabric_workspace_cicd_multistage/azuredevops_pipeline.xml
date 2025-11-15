@@ -202,3 +202,105 @@ jobs:
         }
 
         Write-Host "All workspaces from config processed successfully."
+
+
+
+
+jobs:
+- job: DeployFabricWorkspaces
+  displayName: 'Deploy Fabric workspaces from config'
+  pool:
+    name: 'Azure PreProd Pipelines'   # your self-hosted Windows agent pool
+
+  variables:
+  - name: environment
+    value: 'dev'
+  - group: fabric_$(environment)      # e.g. fabric_dev variable group
+
+  steps:
+  # 1. Install Fabric CLI
+  - script: |
+      "C:\Program Files\Python312\python.exe" -m pip install --upgrade pip
+      "C:\Program Files\Python312\python.exe" -m pip install ms-fabric-cli
+    displayName: 'Install Fabric CLI'
+
+  # 2. Sanity check
+  - script: |
+      "C:\Program Files\Python312\Scripts\fab.exe" --version
+    displayName: 'Fab Version'
+
+  # 3. Authenticate (service principal)
+  - script: |
+      "C:\Program Files\Python312\Scripts\fab.exe" auth login -u $(dev_client_id) -p $(dev_client_secret) --tenant $(tenant_id)
+    displayName: 'Fabric CLI Authentication'
+
+  # 4. Create workspaces from config (ACL only when created)
+  - task: PowerShell@2
+    displayName: 'Create Fabric workspaces for all sources from config'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $ErrorActionPreference = 'Stop'
+
+        $fabPath    = "C:\Program Files\Python312\Scripts\fab.exe"
+        $configPath = "$(Build.SourcesDirectory)\infra\workspaces.json"
+        $envSuffix  = "$(environment)"   # e.g. dev / test / prod
+
+        Write-Host "Loading workspace config from $configPath"
+
+        if (-not (Test-Path $configPath)) {
+          throw "Config file not found: $configPath"
+        }
+
+        # Read JSON and parse
+        $json       = Get-Content $configPath -Raw
+        $workspaces = ConvertFrom-Json -InputObject $json
+
+        # Ensure it's always an array
+        if ($workspaces -isnot [System.Collections.IEnumerable] -or $workspaces -is [string]) {
+          $workspaces = @($workspaces)
+        }
+
+        Write-Host "Found $($workspaces.Count) workspace entries in config."
+
+        foreach ($ws in $workspaces) {
+          $baseName = [string]$ws.workspaceName
+
+          if (-not $baseName) {
+            Write-Warning "Skipping entry with no workspaceName"
+            continue
+          }
+
+          # Build full workspace name: base + env suffix
+          $name = "$baseName$envSuffix"
+
+          $capacity = if ($ws.capacityName) { $ws.capacityName } else { "$(fabric_capacity_name)" }
+          $admin    = if ($ws.adminObjectId) { $ws.adminObjectId } else { "$(fabric_workspace_admin_id)" }
+
+          Write-Host "---------------------------------------------"
+          Write-Host "Processing workspace: '$name' (source = $($ws.source))"
+
+          # Check if workspace exists
+          & $fabPath exists "$name.Workspace"
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "  - Workspace '$name' already exists – skipping create and ACL."
+          }
+          else {
+            Write-Host "  - Workspace '$name' does not exist – creating..."
+            & $fabPath create "$name.Workspace" -P "capacityname=$capacity"
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to create workspace '$name'. Exit code: $LASTEXITCODE"
+            }
+
+            Write-Host "  - Setting admin ACL for new workspace..."
+            & $fabPath acl set "$name.Workspace" -I $admin -R admin -f
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to set admin ACL for workspace '$name'. Exit code: $LASTEXITCODE"
+            }
+          }
+        }
+
+        Write-Host "All workspaces from config processed."
+
