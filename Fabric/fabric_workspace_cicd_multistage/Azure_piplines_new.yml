@@ -114,6 +114,22 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Failed to set admin ACL for workspace '$name'. Exit code: $LASTEXITCODE"
           }
+          # 3) Create folder + lakehouse structure
+          Write-Host "  - Creating default folder & lakehouse structure in workspace '$name'..."
+
+          # Top-level folders
+          New-FabItem -Path "$name.Workspace/Pipelines"   -Type "Folder"
+          New-FabItem -Path "$name.Workspace/Notebooks"   -Type "Folder"
+          New-FabItem -Path "$name.Workspace/Scripts"     -Type "Folder"
+          New-FabItem -Path "$name.Workspace/Lakehouses"  -Type "Folder"
+
+          # Lakehouses under Lakehouses folder (Bronze / Silver / Gold)
+          New-FabItem -Path "$name.Workspace/Lakehouses/bronze" -Type "Lakehouse"
+          New-FabItem -Path "$name.Workspace/Lakehouses/silver" -Type "Lakehouse"
+          New-FabItem -Path "$name.Workspace/Lakehouses/gold"   -Type "Lakehouse"
+        }
+
+        Write-Host "All workspaces from config created with folder structure."
         }
 
         Write-Host "All workspaces from config processed."
