@@ -1,0 +1,119 @@
+jobs:
+- job: DeployFabricWorkspaces
+  displayName: 'Deploy Fabric workspaces from config'
+  pool:
+    name: 'Azure PreProd Pipelines'    # your self-hosted Windows pool
+
+  variables:
+  - name: environment
+    value: 'dev'
+  - group: fabric_$(environment)       # e.g. fabric_dev variable group
+
+  steps:
+  # 1. Install Fabric CLI
+  - script: |
+      "C:\Program Files\Python312\python.exe" -m pip install --upgrade pip
+      "C:\Program Files\Python312\python.exe" -m pip install ms-fabric-cli
+    displayName: 'Install Fabric CLI'
+
+  # 2. Sanity check
+  - script: |
+      "C:\Program Files\Python312\Scripts\fab.exe" --version
+    displayName: 'Fab Version'
+
+  # 3. Authenticate Fabric CLI as service principal
+  - script: |
+      "C:\Program Files\Python312\Scripts\fab.exe" auth login -u $(dev_client_id) -p $(dev_client_secret) --tenant $(tenant_id)
+    displayName: 'Fabric CLI Authentication'
+
+  # 4. Create workspaces from JSON, using `fab ls` to decide what exists
+  - task: PowerShell@2
+    displayName: 'Create Fabric workspaces for all sources from config'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $ErrorActionPreference = 'Stop'
+
+        $fabPath    = "C:\Program Files\Python312\Scripts\fab.exe"
+        # 👇 adjust if your file is somewhere else
+        $configPath = "$(Build.SourcesDirectory)\infra\workspaces.json"
+
+        Write-Host "Using config file: $configPath"
+
+        if (-not (Test-Path $configPath)) {
+          throw "Config file not found: $configPath"
+        }
+
+        # 1) Get current workspaces from Fabric with 'fab ls'
+        Write-Host "Fetching existing workspaces using 'fab ls'..."
+        $lsOutput = & $fabPath ls 2>&1
+
+        Write-Host "DEBUG: raw 'fab ls' output:"
+        $lsOutput | ForEach-Object { Write-Host "  $_" }
+
+        # Lines ending in '.Workspace' correspond to workspace items.
+        # Extract the string before '.Workspace' as the workspace name.
+        $existingNames = $lsOutput |
+          Where-Object { $_ -match '\.Workspace\s*$' } |
+          ForEach-Object {
+            ($_ -split '\.Workspace')[0].Trim()
+          }
+
+        Write-Host "DEBUG: existing workspace names: $($existingNames -join ', ')"
+
+        # 2) Load JSON config (array of objects)
+        $json       = Get-Content $configPath -Raw
+        $workspaces = $json | ConvertFrom-Json
+        $workspaces = @($workspaces)   # force array even if only one entry
+
+        Write-Host "DEBUG: workspaces.Count = $($workspaces.Count)"
+
+        # 3) Loop each workspace from config
+        for ($i = 0; $i -lt $workspaces.Count; $i++) {
+          $ws = $workspaces[$i]
+
+          $name     = [string]$ws.workspaceName
+          $source   = [string]$ws.source
+          $capacity = [string]$ws.capacityName
+          $admin    = [string]$ws.adminObjectId
+
+          if ([string]::IsNullOrWhiteSpace($name)) {
+            Write-Warning "Skipping index $i: no workspaceName"
+            continue
+          }
+          if ([string]::IsNullOrWhiteSpace($capacity)) {
+            throw "capacityName is missing at index $i for workspaceName '$name'"
+          }
+          if ([string]::IsNullOrWhiteSpace($admin)) {
+            throw "adminObjectId is missing at index $i for workspaceName '$name'"
+          }
+
+          Write-Host "---------------------------------------------"
+          Write-Host "Index       : $i"
+          Write-Host "source      : $source"
+          Write-Host "name        : '$name'"
+          Write-Host "capacity    : $capacity"
+          Write-Host "adminObject : $admin"
+
+          # 4) Decide based on `fab ls` result, NOT exit codes
+          if ($existingNames -contains $name) {
+            Write-Host "  - 'fab ls' says workspace '$name' already exists – skipping create and ACL."
+            continue
+          }
+
+          Write-Host "  - Workspace '$name' NOT found in 'fab ls' – creating..."
+          & $fabPath create "$name.Workspace" -P "capacityname=$capacity"
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to create workspace '$name'. Exit code: $LASTEXITCODE"
+          }
+
+          Write-Host "  - Setting admin ACL for new workspace..."
+          & $fabPath acl set "$name.Workspace" -I $admin -R admin -f
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to set admin ACL for workspace '$name'. Exit code: $LASTEXITCODE"
+          }
+        }
+
+        Write-Host "All workspaces from config processed."
