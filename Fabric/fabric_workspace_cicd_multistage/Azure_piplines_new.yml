@@ -60,7 +60,20 @@ jobs:
           }
 
         Write-Host "DEBUG: existing workspace names: $($existingNames -join ', ')"
-
+        function New-FabItem {
+                  param(
+                    [Parameter(Mandatory = $true)][string]$Path,  # e.g. ws-mdf-dev02.Workspace/Lakehouses/bronze
+                    [Parameter(Mandatory = $true)][string]$Type   # 'Folder' or 'Lakehouse'
+                  )
+        
+                  Write-Host "    - Creating $Type '$Path.$Type'..."
+                  & $fabPath create "$Path.$Type"
+                  $code = $LASTEXITCODE
+        
+                  if ($code -ne 0) {
+                    throw "Failed to create $Type '$Path' (exit code $code)."
+                  }
+                }
         # 2) Load JSON config (array of objects)
         $json       = Get-Content $configPath -Raw
         $workspaces = $json | ConvertFrom-Json
