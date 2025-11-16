@@ -1,0 +1,119 @@
+jobs:
+- job: CleanupFabricWorkspaces
+  displayName: 'Cleanup unwanted Fabric workspaces (dev)'
+  pool:
+    name: 'Azure PreProd Pipelines'    # your self-hosted Windows pool
+
+  variables:
+  - name: environment
+    value: 'dev'
+  - name: dry_run            # set to 'true' to only log, 'false' to actually delete
+    value: 'true'
+  - group: fabric_$(environment)       # e.g. fabric_dev variable group
+
+  steps:
+  # 1. Install Fabric CLI
+  - script: |
+      "C:\Program Files\Python312\python.exe" -m pip install --upgrade pip
+      "C:\Program Files\Python312\python.exe" -m pip install ms-fabric-cli
+    displayName: 'Install Fabric CLI'
+
+  # 2. Sanity check
+  - script: |
+      "C:\Program Files\Python312\Scripts\fab.exe" --version
+    displayName: 'Fab Version'
+
+  # 3. Authenticate Fabric CLI as service principal
+  - script: |
+      "C:\Program Files\Python312\Scripts\fab.exe" auth login -u $(dev_client_id) -p $(dev_client_secret) --tenant $(tenant_id)
+    displayName: 'Fabric CLI Authentication'
+
+  # 4. Cleanup job: find orphans and delete (or just log in dry-run)
+  - task: PowerShell@2
+    displayName: 'Delete unwanted Fabric workspaces (orphan cleanup)'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $ErrorActionPreference = 'Stop'
+
+        $fabPath      = "C:\Program Files\Python312\Scripts\fab.exe"
+        $configPath   = "$(Build.SourcesDirectory)\infra\workspaces.json"
+        $managedPrefix = "ws-"               # only touch workspaces starting with this
+        $dryRun       = "$(dry_run)" -eq "true"
+
+        Write-Host "Using config file: $configPath"
+        Write-Host "DRY RUN mode: $dryRun"
+        Write-Host "Managed prefix: $managedPrefix"
+
+        if (-not (Test-Path $configPath)) {
+          throw "Config file not found: $configPath"
+        }
+
+        # 1) Get current workspaces from Fabric
+        Write-Host "Fetching existing workspaces using 'fab ls'..."
+        $lsOutput = & $fabPath ls 2>&1
+
+        Write-Host "DEBUG: raw 'fab ls' output:"
+        $lsOutput | ForEach-Object { Write-Host "  $_" }
+
+        # Extract workspace names from lines ending in '.Workspace'
+        $existingNames = $lsOutput |
+          Where-Object { $_ -match '\.Workspace\s*$' } |
+          ForEach-Object {
+            ($_ -split '\.Workspace')[0].Trim()
+          }
+
+        Write-Host "DEBUG: existing workspace names: $($existingNames -join ', ')"
+
+        # 2) Load desired workspaces from JSON
+        $json       = Get-Content $configPath -Raw
+        $workspaces = $json | ConvertFrom-Json
+        $workspaces = @($workspaces)
+
+        $desiredNames = $workspaces |
+          ForEach-Object { [string]$_.workspaceName }
+
+        Write-Host "Desired (managed) workspace names from JSON: $($desiredNames -join ', ')"
+
+        # 3) Determine orphans: existing managed workspaces NOT in desired list
+        $candidateManaged = $existingNames |
+          Where-Object { $_.StartsWith($managedPrefix) }
+
+        Write-Host "Managed workspaces currently in Fabric (prefix '$managedPrefix'): $($candidateManaged -join ', ')"
+
+        $orphans = $candidateManaged |
+          Where-Object { $desiredNames -notcontains $_ }
+
+        if (-not $orphans -or $orphans.Count -eq 0) {
+          Write-Host "No orphan workspaces found to delete. Nothing to do."
+          return
+        }
+
+        Write-Host "---------------------------------------------"
+        Write-Host "The following workspaces are ORPHANS (existing in Fabric, not in JSON, prefix '$managedPrefix'):"
+        $orphans | ForEach-Object { Write-Host "  - $_" }
+
+        if ($dryRun) {
+          Write-Host "DRY RUN is enabled – NO workspaces will be deleted."
+          return
+        }
+
+        Write-Host "DRY RUN is FALSE – proceeding to delete orphan workspaces..."
+
+        foreach ($name in $orphans) {
+          Write-Host "---------------------------------------------"
+          Write-Host "Deleting workspace '$name'..."
+
+          # Delete the workspace and underlying items
+          & $fabPath rm "$name.Workspace" --force
+          $code = $LASTEXITCODE
+
+          if ($code -eq 0) {
+            Write-Host "  - Successfully deleted workspace '$name'."
+          }
+          else {
+            Write-Warning "  - Failed to delete workspace '$name'. Exit code: $code"
+          }
+        }
+
+        Write-Host "Workspace cleanup completed."
