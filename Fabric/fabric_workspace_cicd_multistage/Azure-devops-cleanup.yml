@@ -1,13 +1,13 @@
 jobs:
 - job: CleanupFabricWorkspaces
-  displayName: 'Cleanup unwanted Fabric workspaces (dev)'
+  displayName: 'Cleanup specific Fabric workspaces from cleanup-workspaces.json'
   pool:
     name: 'Azure PreProd Pipelines'    # your self-hosted Windows pool
 
   variables:
   - name: environment
     value: 'dev'
-  - name: dry_run            # set to 'true' to only log, 'false' to actually delete
+  - name: dry_run          # 'true' = only log, 'false' = actually delete
     value: 'true'
   - group: fabric_$(environment)       # e.g. fabric_dev variable group
 
@@ -28,28 +28,26 @@ jobs:
       "C:\Program Files\Python312\Scripts\fab.exe" auth login -u $(dev_client_id) -p $(dev_client_secret) --tenant $(tenant_id)
     displayName: 'Fabric CLI Authentication'
 
-  # 4. Cleanup job: find orphans and delete (or just log in dry-run)
+  # 4. Delete only workspaces listed in cleanup-workspaces.json
   - task: PowerShell@2
-    displayName: 'Delete unwanted Fabric workspaces (orphan cleanup)'
+    displayName: 'Delete Fabric workspaces listed in cleanup-workspaces.json'
     inputs:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = 'Stop'
 
-        $fabPath      = "C:\Program Files\Python312\Scripts\fab.exe"
-        $configPath   = "$(Build.SourcesDirectory)\infra\workspaces.json"
-        $managedPrefix = "ws-"               # only touch workspaces starting with this
-        $dryRun       = "$(dry_run)" -eq "true"
+        $fabPath    = "C:\Program Files\Python312\Scripts\fab.exe"
+        $configPath = "$(Build.SourcesDirectory)\infra\cleanup-workspaces.json"
+        $dryRun     = "$(dry_run)" -eq "true"
 
-        Write-Host "Using config file: $configPath"
+        Write-Host "Using cleanup file: $configPath"
         Write-Host "DRY RUN mode: $dryRun"
-        Write-Host "Managed prefix: $managedPrefix"
 
         if (-not (Test-Path $configPath)) {
-          throw "Config file not found: $configPath"
+          throw "Cleanup config file not found: $configPath"
         }
 
-        # 1) Get current workspaces from Fabric
+        # 1) Get existing workspaces from Fabric
         Write-Host "Fetching existing workspaces using 'fab ls'..."
         $lsOutput = & $fabPath ls 2>&1
 
@@ -65,46 +63,40 @@ jobs:
 
         Write-Host "DEBUG: existing workspace names: $($existingNames -join ', ')"
 
-        # 2) Load desired workspaces from JSON
-        $json       = Get-Content $configPath -Raw
-        $workspaces = $json | ConvertFrom-Json
-        $workspaces = @($workspaces)
+        # 2) Load cleanup list (only these will be considered)
+        $json     = Get-Content $configPath -Raw
+        $cleanup  = $json | ConvertFrom-Json
+        $cleanup  = @($cleanup)   # force array even if only one entry
 
-        $desiredNames = $workspaces |
-          ForEach-Object { [string]$_.workspaceName }
+        Write-Host "DEBUG: cleanup entries count = $($cleanup.Count)"
 
-        Write-Host "Desired (managed) workspace names from JSON: $($desiredNames -join ', ')"
-
-        # 3) Determine orphans: existing managed workspaces NOT in desired list
-        $candidateManaged = $existingNames |
-          Where-Object { $_.StartsWith($managedPrefix) }
-
-        Write-Host "Managed workspaces currently in Fabric (prefix '$managedPrefix'): $($candidateManaged -join ', ')"
-
-        $orphans = $candidateManaged |
-          Where-Object { $desiredNames -notcontains $_ }
-
-        if (-not $orphans -or $orphans.Count -eq 0) {
-          Write-Host "No orphan workspaces found to delete. Nothing to do."
+        if ($cleanup.Count -eq 0) {
+          Write-Host "No entries in cleanup-workspaces.json – nothing to do."
           return
         }
 
-        Write-Host "---------------------------------------------"
-        Write-Host "The following workspaces are ORPHANS (existing in Fabric, not in JSON, prefix '$managedPrefix'):"
-        $orphans | ForEach-Object { Write-Host "  - $_" }
+        foreach ($item in $cleanup) {
+          $name = [string]$item.workspaceName
 
-        if ($dryRun) {
-          Write-Host "DRY RUN is enabled – NO workspaces will be deleted."
-          return
-        }
+          if ([string]::IsNullOrWhiteSpace($name)) {
+            Write-Warning "Skipping entry with empty workspaceName in cleanup file."
+            continue
+          }
 
-        Write-Host "DRY RUN is FALSE – proceeding to delete orphan workspaces..."
-
-        foreach ($name in $orphans) {
           Write-Host "---------------------------------------------"
-          Write-Host "Deleting workspace '$name'..."
+          Write-Host "Requested delete for workspace: '$name'"
 
-          # Delete the workspace and underlying items
+          if ($existingNames -notcontains $name) {
+            Write-Host "  - Workspace '$name' not found in Fabric (according to 'fab ls') – skipping."
+            continue
+          }
+
+          if ($dryRun) {
+            Write-Host "  - DRY RUN: would delete workspace '$name' with: fab rm '$name.Workspace' --force"
+            continue
+          }
+
+          Write-Host "  - Deleting workspace '$name'..."
           & $fabPath rm "$name.Workspace" --force
           $code = $LASTEXITCODE
 
@@ -116,4 +108,4 @@ jobs:
           }
         }
 
-        Write-Host "Workspace cleanup completed."
+        Write-Host "Cleanup pipeline finished processing all entries from cleanup-workspaces.json."
