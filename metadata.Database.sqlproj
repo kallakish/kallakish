@@ -1,0 +1,519 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <Name>metadata</Name>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectVersion>4.1</ProjectVersion>
+    <ProjectGuid>{1b816f0c-6ec7-41f3-921b-7c6d4f229b7b}</ProjectGuid>
+    <DSP>Microsoft.Data.Tools.Schema.Sql.SqlAzureV12DatabaseSchemaProvider</DSP>
+    <OutputType>Database</OutputType>
+    <RootPath>
+    </RootPath>
+    <RootNamespace>metadata</RootNamespace>
+    <AssemblyName>metadata</AssemblyName>
+    <ModelCollation>1033, CI</ModelCollation>
+    <DefaultFileStructure>BySchemaAndSchemaType</DefaultFileStructure>
+    <DeployToDatabase>True</DeployToDatabase>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetLanguage>CS</TargetLanguage>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <SqlServerVerification>False</SqlServerVerification>
+    <IncludeCompositeObjects>True</IncludeCompositeObjects>
+    <TargetDatabaseSet>True</TargetDatabaseSet>
+    <DefaultSchema>config</DefaultSchema>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>bin\Release\</OutputPath>
+    <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
+    <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <DefineDebug>false</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <OutputPath>bin\Debug\</OutputPath>
+    <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <DefineDebug>true</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">11.0</VisualStudioVersion>
+    <!-- Default to the v11.0 targets path if the targets file for the current VS version is not found -->
+    <SSDTExists Condition="Exists('$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\SSDT\Microsoft.Data.Tools.Schema.SqlTasks.targets')">True</SSDTExists>
+    <VisualStudioVersion Condition="'$(SSDTExists)' == ''">11.0</VisualStudioVersion>
+  </PropertyGroup>
+  <Import Condition="'$(NetCoreBuild)' != 'true' AND '$(SQLDBExtensionsRefPath)' != ''" Project="$(SQLDBExtensionsRefPath)\Microsoft.Data.Tools.Schema.SqlTasks.targets" />
+  <Import Condition="'$(NetCoreBuild)' != 'true' AND '$(SQLDBExtensionsRefPath)' == ''" Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\SSDT\Microsoft.Data.Tools.Schema.SqlTasks.targets" />
+  <ItemGroup>
+    <Folder Include="Properties" />
+    <Folder Include="Security" />
+    <Folder Include="Security\Schema" />
+    <Folder Include="audit" />
+    <Folder Include="audit\Tables" />
+    <Folder Include="audit\Stored Procedures" />
+    <Folder Include="config" />
+    <Folder Include="config\Tables" />
+    <Folder Include="config\Stored Procedures" />
+    <Folder Include="util" />
+    <Folder Include="util\Functions" />
+    <Folder Include="pipeline" />
+    <Folder Include="pipeline\templates" />
+    <Folder Include="pipeline\scripts" />
+    <Folder Include="__Scripts" />
+    <Folder Include="__Publish" />
+    <Folder Include="__Bootstrap" />
+  </ItemGroup>
+  <ItemGroup>
+    <Build Include="Security\Schema\config.sql" />
+    <Build Include="Security\Schema\audit.sql" />
+    <Build Include="Security\Schema\util.sql" />
+    <Build Include="Security\Schema\functions.sql" />
+    <Build Include="config\Tables\Application.sql" />
+    <Build Include="config\Tables\Pipeline.sql" />
+    <Build Include="config\Tables\Stage.sql" />
+    <Build Include="config\Tables\PipelineGroup.sql" />
+    <Build Include="config\Tables\PipelineSet.sql" />    
+    <Build Include="config\Tables\PipelineTrigger.sql" />
+    <Build Include="audit\Tables\CurrentExecution.sql" />
+    <Build Include="audit\Tables\HistoricalExecution.sql" />
+    <Build Include="config\Tables\PipelineParameter.sql" />
+    <Build Include="functions\Tables\AsyncFunctions.sql" />
+    <Build Include="audit\Views\RecentExecutionSummary.sql" />
+    <Build Include="audit\Stored Procedures\Create_CurrentExecution.sql" />
+    <Build Include="audit\Stored Procedures\Cleanup_Cancelled_Pipelines.sql" />
+    <Build Include="audit\Stored Procedures\Create_CurrentExecution_v2.sql" />
+    <Build Include="audit\Stored Procedures\Update_CurrentExecutionRowCounts.sql" />
+    <Build Include="audit\Stored Procedures\Set_LogPipelineRunning.sql" />
+    <Build Include="audit\Stored Procedures\Set_LogPipelineSuccess.sql" />
+    <Build Include="audit\Stored Procedures\Set_LogPipelineFailed.sql" />
+    <Build Include="audit\Stored Procedures\Insert_CurrentExecutionToHistorical.sql" />
+    <Build Include="audit\Stored Procedures\Cancel_timout_pipelines.sql" />
+    <Build Include="audit\Stored Procedures\Get_PipelineMissingTriggerSchedule.sql" />
+    <Build Include="audit\Stored Procedures\Update_ActivePipelineGroup.sql" />
+    <Build Include="config\Stored Procedures\Get_Stages.sql" />
+    <Build Include="config\Stored Procedures\Get_Sets.sql" />   
+    <Build Include="config\Stored Procedures\Get_PipelinesInStage.sql" />
+    <Build Include="config\Stored Procedures\Get_PipelineParameters.sql" />
+    <Build Include="config\Stored Procedures\Get_Pipeline_LastModifiedDate.sql" />
+    <Build Include="config\Stored Procedures\Update_Pipeline_LastModifiedDate.sql" />
+    <Build Include="config\Stored Procedures\Update_PipelineLastSuccesfulExecution.sql" />
+    <Build Include="config\Stored Procedures\Update_Pipeline_Metadata.sql" />
+    <Build Include="functions\Stored Procedures\Create_Async_Function.sql" />
+    <Build Include="functions\Stored Procedures\Update_Async_Function.sql" />
+    <None Include="__Bootstrap\initial-dev.sql" />
+    <None Include="__Bootstrap\initial-sbox.sql" />
+    <None Include="__Bootstrap\initial-ithc.sql" />
+    <None Include="__Bootstrap\initial-test.sql" />
+    <None Include="__Bootstrap\initial-stg.sql" />
+    <None Include="__Bootstrap\initial-prod.sql" />
+    <Build Include="util\Functions\Base64.sql" />
+    <Build Include="util\Functions\HMAC.sql" />
+    <Build Include="util\Functions\JWT_encode.sql" />
+    <Build Include="util\Functions\Notify_JWT_Encode.sql" />
+    <Build Include="util\Functions\XmlToJson.sql" />
+    <Build Include="util\Functions\GetCHARINDEX.sql" />
+    <None Include="__Publish\sbox.publish.xml" />
+    <PostDeploy Include="__Scripts\_PostDeployController.sql" />
+    <None Include="__Scripts\0001_Application.sql" />
+    <None Include="__Scripts\0002_Stage.sql" />
+    <None Include="__Scripts\0003_PipelineGroup.sql" />   
+    <None Include="__Scripts\0004_PipelineSets.sql" /> 
+    <None Include="__Scripts\1001_Pipeline_IngestPersistNotify.sql" />
+    <None Include="__Scripts\2001_PipelineParameter_IngestPersistNotify.sql" />
+    <None Include="__Scripts\1002_Pipeline_IngestPersistAvaya.sql" />
+    <None Include="__Scripts\2002_PipelineParameter_IngestPersistAvaya.sql" />
+    <None Include="__Scripts\1007_Pipeline_IngestPersistQualtrics.sql" />
+    <None Include="__Scripts\2007_PipelineParameter_IngestPersistQualtrics.sql" />
+    <None Include="__Scripts\1010_Pipeline_IngestPersistEightByEight.sql" />
+    <None Include="__Scripts\2010_PipelineParameter_IngestPersistEightByEight.sql" />
+    <None Include="__Scripts\1016_Pipeline_IngestPersist_VideoHearing.sql" />
+    <None Include="__Scripts\2016_PipelineParameter_IngestPersist_VideoHearing.sql" />
+    <None Include="azure-pipelines.yml" />
+    <None Include="pipeline\templates\deploySQL.yml" />
+    <None Include="pipeline\scripts\deploySqlPackage.ps1" />
+    <None Include="pipeline\scripts\deploySqlPackage.sh" />
+  </ItemGroup>
+  <ItemGroup>
+    <SqlCmdVariable Include="environment">
+      <DefaultValue>sbox</DefaultValue>
+      <Value>$(SqlCmdVar__1)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="SubscriptionId">
+      <DefaultValue>a59b24ce-90e6-4c9f-b8cc-4d92812e76de</DefaultValue>
+      <Value>$(SqlCmdVar__2)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="TenantId">
+      <DefaultValue>20516ab6-aa44-4ea3-857b-7c91160e6b58</DefaultValue>
+      <Value>$(SqlCmdVar__3)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="paymentActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__4)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="slActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__5)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="slExportActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__6)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="avayaExportActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__7)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="avayaActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__8)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="prodsurvey">
+      <DefaultValue>N</DefaultValue>
+      <Value>$(SqlCmdVar__9)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="smartSurveyActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__10)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="notifyActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__11)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="pcqActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__12)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="qualtricsActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__13)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="qualtricsTestActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__14)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="qualtricsProdActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__15)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="avayaHistoricalDataActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__16)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="testingActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__17)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="eightByEightActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__18)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="commonPlatformActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__19)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="ethosActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__20)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="coitActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__21)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="enforcementMarstonActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__22)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="enforcementCderActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__23)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="enforcementJacobsActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__24)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="enforcementMarstonBaseUrl">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__25)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="enforcementCderBaseUrl">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__26)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="enforcementJacobsBaseUrl">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__27)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="CCDActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__28)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="OpticActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__29)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="opticBaseURL">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__30)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="opticReport1">
+      <DefaultValue>50936</DefaultValue>
+      <Value>$(SqlCmdVar__31)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="opticReport2">
+      <DefaultValue>114624</DefaultValue>
+      <Value>$(SqlCmdVar__32)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="opticReport3">
+      <DefaultValue>114625</DefaultValue>
+      <Value>$(SqlCmdVar__33)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="opticReport4">
+      <DefaultValue>118225</DefaultValue>
+      <Value>$(SqlCmdVar__34)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="opticReport5">
+      <DefaultValue>171953</DefaultValue>
+      <Value>$(SqlCmdVar__35)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="opticReport6">
+      <DefaultValue>196589</DefaultValue>
+      <Value>$(SqlCmdVar__36)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="resetLastModifiedDate">
+      <DefaultValue>0</DefaultValue>
+      <Value>$(SqlCmdVar__37)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="IrisHistoricalFileName">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__38)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="IrisHistoricalSheetName">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__39)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="IRISActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__40)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="CGICasemanActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__41)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="CGICapsActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__42)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="CGIPcolActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__43)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="vhVideoActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__60)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="vhNotificationActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__61)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="vhBookingsActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__62)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="CGIfamilymanActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__63)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="CGIfamilymandbenv">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__64)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="CGIAriaActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__65)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="HMCActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__66)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="OPTGAPS2Active">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__67)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="OPTGAPS2dbenv">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__68)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="OPTenv">
+      <DefaultValue></DefaultValue>
+      <Value>$(SqlCmdVar__69)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="CGIXhibitActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__70)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="CGIxhibitdbenv">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__71)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="GoogleAnalyticsUaNonProdActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__72)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="GoogleAnalyticsUaProductionActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__73)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="GoogleAnalyticsGa4NonProdActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__74)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="GoogleAnalyticsGa4ProductionActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__75)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="CGIJurorActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__76)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="eightByEightParquetActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__88)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="Version">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__89)</Value>
+    </SqlCmdVariable>
+
+    <SqlCmdVariable Include="avayaParquetActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__90)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="paymentParquetActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__91)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="pcqParquetActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__92)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="GLIMRActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__95)</Value>
+     </SqlCmdVariable>
+    <SqlCmdVariable Include="CGITecActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__96)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="AdhocIngestionActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__97)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="enforcementParquetMarstonActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__98)</Value>
+    </SqlCmdVariable>    
+    <SqlCmdVariable Include="enforcementParquetCderActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__99)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="enforcementParquetJacobsActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__100)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="notifyParquetActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__101)</Value>
+    </SqlCmdVariable> 
+    <SqlCmdVariable Include="VerintActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__102)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="verintSftpHost">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__103)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="verintSftpFolder">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__104)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="PIGoogleAnalyticsGa4NonProdActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__105)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="PIGoogleAnalyticsGa4ProdActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__106)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="PIActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__107)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="ALRActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__109)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="PATActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__110)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="CgSftpHost">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__111)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="CgSftpPort">
+      <DefaultValue>2000</DefaultValue>
+      <Value>$(SqlCmdVar__112)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="ceFilesActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__113)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="cefile_folderPrefix">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__114)</Value>  
+    </SqlCmdVariable>    
+    <SqlCmdVariable Include="CGILibraActive">
+      <DefaultValue>0</DefaultValue>
+      <Value>$(SqlCmdVar__115)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="CGILibraAppActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__116)</Value>  
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="slParquetActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__117)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="commonPlatformParquetActive">
+      <DefaultValue>1</DefaultValue>
+      <Value>$(SqlCmdVar__118)</Value>
+    </SqlCmdVariable>
+  </ItemGroup>
+  <Import Condition="'$(NetCoreBuild)' == 'true'" Project="$(NETCoreTargetsPath)\Microsoft.Data.Tools.Schema.SqlTasks.targets" />
+  <ItemGroup>
+    <PackageReference Condition="'$(NetCoreBuild)' == 'true'" Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.0" PrivateAssets="All" />
+  </ItemGroup>
+  <Target Name="BeforeBuild">
+    <Delete Files="$(BaseIntermediateOutputPath)\project.assets.json" />
+  </Target>
+  <ItemGroup>
+    <ArtifactReference Condition="'$(NetCoreBuild)' == 'true'" Include="$(NETCoreTargetsPath)\SystemDacpacs\AzureV12\master.dacpac">
+      <SuppressMissingDependenciesErrors>False</SuppressMissingDependenciesErrors>
+      <DatabaseVariableLiteralValue>master</DatabaseVariableLiteralValue>
+    </ArtifactReference>
+    <ArtifactReference Condition="'$(NetCoreBuild)' != 'true'" Include="$(DacPacRootPath)\Extensions\Microsoft\SQLDB\Extensions\SqlServer\AzureV12\SqlSchemas\master.dacpac">
+      <SuppressMissingDependenciesErrors>False</SuppressMissingDependenciesErrors>
+      <DatabaseVariableLiteralValue>master</DatabaseVariableLiteralValue>
+    </ArtifactReference>
+  </ItemGroup>
+</Project>
