@@ -77,3 +77,80 @@ stages:
         scriptLocation: inlineScript
         inlineScript: |
           az deployment sub create             --name deploy-fabric-prod             --location "UK South"             --template-file infra/main.bicep             --parameters @infra/parameters-prod.json
+
+
+
+
+      - stage: Dev
+  displayName: 'Deploy to DEV'
+  variables:
+    - group: vg-fabric-dev
+
+  jobs:
+  - job: DeployDev
+    displayName: 'Deploy DEV Infra'
+    steps:
+    - checkout: self
+
+    - task: AzureCLI@2
+      displayName: 'Deploy DEV Infra'
+      inputs:
+        azureSubscription: 'sc-azure-fabric'
+        scriptType: bash
+        scriptLocation: inlineScript
+        failOnStandardError: true        # treat stderr as failure as well
+        inlineScript: |
+          set -euo pipefail              # stop on first error
+
+          DEPLOY_NAME="deploy-fabric-dev-$(date +%s)"
+          TEMPLATE_FILE="infra/main.bicep"
+          PARAM_FILE="infra/Parameter-azure-fabric.json"
+          LOCATION="uksouth"
+
+          echo "=== DEV: starting subscription deployment ==="
+          echo "Deployment name : $DEPLOY_NAME"
+          echo "Template        : $TEMPLATE_FILE"
+          echo "Parameters file : $PARAM_FILE"
+          echo "Location        : $LOCATION"
+          echo
+
+          # Run the deployment
+          az deployment sub create \
+            --name "$DEPLOY_NAME" \
+            --location "$LOCATION" \
+            --template-file "$TEMPLATE_FILE" \
+            --parameters @"$PARAM_FILE" \
+            --only-show-errors
+
+          echo
+          echo "=== DEV: checking deployment provisioningState ==="
+          STATE=$(az deployment sub show \
+            --name "$DEPLOY_NAME" \
+            --query "properties.provisioningState" \
+            -o tsv)
+
+          echo "Deployment state: $STATE"
+
+          if [ "$STATE" != "Succeeded" ]; then
+            echo "Deployment did NOT succeed (state=$STATE). Showing failed operations..."
+            az deployment operation sub list \
+              --name "$DEPLOY_NAME" \
+              --query "[?properties.provisioningState=='Failed'].
+                        {type:properties.targetResource.resourceType,
+                         name:properties.targetResource.resourceName,
+                         status:properties.statusMessage}" \
+              -o jsonc || true
+            exit 1
+          fi
+
+          echo
+          echo "=== DEV: deployment succeeded ==="
+
+          echo
+          echo "=== DEV: all operations (summary) ==="
+          az deployment operation sub list \
+            --name "$DEPLOY_NAME" \
+            --query "[].{type:properties.targetResource.resourceType,
+                         name:properties.targetResource.resourceName,
+                         state:properties.provisioningState}" \
+            -o table
