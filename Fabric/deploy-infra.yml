@@ -154,3 +154,78 @@ stages:
                          name:properties.targetResource.resourceName,
                          state:properties.provisioningState}" \
             -o table
+
+
+
+
+- stage: Test
+  displayName: 'Deploy to TEST'
+  variables:
+    - group: vg-fabric-test
+
+  jobs:
+  - job: DeployTest
+    displayName: 'Deploy TEST Infra'
+    steps:
+    - checkout: self
+
+    - task: AzureCLI@2
+      displayName: 'Deploy TEST Infra'
+      inputs:
+        azureSubscription: 'sc-azure-fabric'
+        scriptType: bash
+        scriptLocation: inlineScript
+        failOnStandardError: true
+        inlineScript: |
+          set -euo pipefail
+
+          cd "$(System.DefaultWorkingDirectory)"
+
+          DEPLOY_NAME="deploy-fabric-test"   # fixed, known name
+          TEMPLATE_FILE="infra/main.bicep"
+          PARAM_FILE="infra/Parameter-azure-fabric-test.json"
+          LOCATION="uksouth"
+
+          echo "=== TEST: starting subscription deployment ==="
+          echo "Deployment name : $DEPLOY_NAME"
+          echo "Template        : $TEMPLATE_FILE"
+          echo "Parameters file : $PARAM_FILE"
+          echo "Location        : $LOCATION"
+          echo
+
+          # Run the deployment and capture the provisioning state directly
+          STATE=$(az deployment sub create \
+            --name "$DEPLOY_NAME" \
+            --location "$LOCATION" \
+            --template-file "$TEMPLATE_FILE" \
+            --parameters @"$PARAM_FILE" \
+            --query "properties.provisioningState" \
+            -o tsv)
+
+          echo "Deployment provisioningState: $STATE"
+
+          if [ "$STATE" != "Succeeded" ]; then
+            echo
+            echo "=== TEST: Deployment FAILED (state=$STATE). 
+Showing failed operations if any... ==="
+
+            # Best effort: list failed operations, but don't break if the deployment isn't recorded
+            az deployment operation sub list \
+              --name "$DEPLOY_NAME" \
+              --query "[?properties.provisioningState=='Failed'].
+                        {type:properties.targetResource.resourceType,
+                         name:properties.targetResource.resourceName,
+                         status:properties.statusMessage}" \
+              -o jsonc || echo "No operations found or deployment not recorded."
+
+            exit 1
+          fi
+
+          echo
+          echo "=== TEST: deployment SUCCEEDED. Summary of operations: ==="
+          az deployment operation sub list \
+            --name "$DEPLOY_NAME" \
+            --query "[].{type:properties.targetResource.resourceType,
+                         name:properties.targetResource.resourceName,
+                         state:properties.provisioningState}" \
+            -o table || echo "Could not list operations (but deployment succeeded)."
