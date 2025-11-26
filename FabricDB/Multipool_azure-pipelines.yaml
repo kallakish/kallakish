@@ -1,228 +1,31 @@
-trigger:
-- master
-
-parameters:
-  - name: integrationEnv
-    displayName: Integration Environment
-    type: string
-    default: 'dev'
-    values:
-      - 'sbox'
-      - 'dev'
-      - 'test'
-      - 'ithc'
-      - 'stg'
-      - 'prod'
-
-  # Per-environment pool names (you can change these)
-  - name: sboxPoolName
-    type: string
-    default: 'Azure SBOX Pool'
-
-  - name: devPoolName
-    type: string
-    default: 'Azure PreProd'       # 👈 your “Dev-name: Azure preprod”
-
-  - name: testPoolName
-    type: string
-    default: 'Azure Test Pool'
-
-  - name: ithcPoolName
-    type: string
-    default: 'Azure ITHC Pool'
-
-  - name: stgPoolName
-    type: string
-    default: 'Azure Stage Pool'
-
-  - name: prodPoolName
-    type: string
-    default: 'Azure Prod'          # 👈 your “Prod-Name: Azure Prod”
-
-  - name: blockDataLoss
-    displayName: Block possible data loss
-    type: string
-    default: 'true'
-    values:
-      - 'true'
-      - 'false'
-
-  - name: dropObjects
-    displayName: Drop objects not present in dacpac
-    type: string
-    default: 'false'
-    values:
-      - 'false'
-      - 'true'
-
-  - name: runBootstrap
-    displayName: Run the bootstrap script
-    type: string
-    default: 'false'
-    values:
-      - 'false'
-      - 'true'
-
 variables:
-  # === UPDATE THESE TO MATCH YOUR PROJECT ===
+  # your existing vars...
   sqlProjPath: 'MetaDataDB/MetaDataDB.sqlproj'
   sqlProjDirectory: 'MetaDataDB'
   dacpacName: 'MetaDataDB.dacpac'
   artifactName: 'metadata-dacpac'
 
-  # Build pool (shared)
-  buildPoolName: 'Azure Build Pool'   # <-- your build pool
+  # build pool (shared)
+  buildPoolName: 'Azure Build Pool'
 
-  # Map integrationEnv -> deployPoolName using template expressions
+  # static pool names per environment
+  sboxPoolName: 'Azure SBOX'
+  devPoolName:  'Azure preprod'
+  testPoolName: 'Azure TEST'
+  ithcPoolName: 'Azure ITHC'
+  stgPoolName:  'Azure STG'
+  prodPoolName: 'Azure Prod'
+
+  # map integrationEnv -> deployPoolName
   ${{ if eq(parameters.integrationEnv, 'sbox') }}:
-    deployPoolName: ${{ parameters.sboxPoolName }}
+    deployPoolName: ${{ variables.sboxPoolName }}
   ${{ if eq(parameters.integrationEnv, 'dev') }}:
-    deployPoolName: ${{ parameters.devPoolName }}
+    deployPoolName: ${{ variables.devPoolName }}
   ${{ if eq(parameters.integrationEnv, 'test') }}:
-    deployPoolName: ${{ parameters.testPoolName }}
+    deployPoolName: ${{ variables.testPoolName }}
   ${{ if eq(parameters.integrationEnv, 'ithc') }}:
-    deployPoolName: ${{ parameters.ithcPoolName }}
+    deployPoolName: ${{ variables.ithcPoolName }}
   ${{ if eq(parameters.integrationEnv, 'stg') }}:
-    deployPoolName: ${{ parameters.stgPoolName }}
+    deployPoolName: ${{ variables.stgPoolName }}
   ${{ if eq(parameters.integrationEnv, 'prod') }}:
-    deployPoolName: ${{ parameters.prodPoolName }}
-
-stages:
-# ==========================
-# 1. BUILD – create DACPAC
-# ==========================
-- stage: Build
-  displayName: 'Build metadata DACPAC'
-  jobs:
-  - job: BuildDb
-    displayName: 'Build SQL project'
-    pool:
-      name: $(buildPoolName)        # 👈 shared build pool
-
-    steps:
-    - checkout: self
-
-    - task: VSBuild@1
-      displayName: 'Build $(sqlProjPath)'
-      inputs:
-        solution: '$(sqlProjPath)'
-        msbuildArgs: '/p:Configuration=Release'
-        platform: 'Any CPU'
-        configuration: 'Release'
-
-    - task: PublishBuildArtifacts@1
-      displayName: 'Publish DACPAC artifact'
-      inputs:
-        PathtoPublish: '$(Build.SourcesDirectory)/$(sqlProjDirectory)/bin/Release'
-        ArtifactName: '$(artifactName)'
-        publishLocation: 'Container'
-
-# ========================================
-# 2. DEPLOY – to chosen Fabric environment
-# ========================================
-- stage: Deploy
-  displayName: 'Deploy to Fabric SQL DB'
-  dependsOn: Build
-  variables:
-    EnvName: ${{ parameters.integrationEnv }}
-  jobs:
-  - job: DeployDb
-    displayName: 'Publish DACPAC to Fabric $(EnvName)'
-
-    # 👇 This is where the magic happens
-    pool:
-      name: ${{ variables.deployPoolName }}   # 👈 resolves to Azure PreProd / Azure Prod / etc.
-
-    steps:
-    - checkout: none
-
-    - task: DownloadBuildArtifacts@0
-      displayName: 'Download DACPAC artifact'
-      inputs:
-        buildType: 'current'
-        downloadType: 'single'
-        artifactName: '$(artifactName)'
-        downloadPath: '$(Pipeline.Workspace)'
-
-    - task: UseDotNet@2
-      displayName: 'Ensure .NET SDK is available'
-      inputs:
-        packageType: 'sdk'
-        version: '8.x'
-        includePreviewVersions: false
-
-    - task: PowerShell@2
-      displayName: 'Install SqlPackage (.NET global tool)'
-      inputs:
-        targetType: 'inline'
-        script: |
-          dotnet tool install --global Microsoft.SqlPackage
-          $sqlPackagePath = "$env:USERPROFILE\.dotnet\tools\sqlpackage.exe"
-          if (-not (Test-Path $sqlPackagePath)) {
-            throw "SqlPackage not found at $sqlPackagePath"
-          }
-          Write-Host "SqlPackage installed at $sqlPackagePath"
-
-    - task: PowerShell@2
-      displayName: 'Deploy DACPAC to Fabric $(EnvName)'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $sqlPackagePath = "$env:USERPROFILE\.dotnet\tools\sqlpackage.exe"
-
-          $artifactRoot = "$(Pipeline.Workspace)\$(artifactName)"
-          if (-not (Test-Path $artifactRoot)) {
-            throw "Artifact root not found at $artifactRoot"
-          }
-
-          $dacpacPath = Join-Path $artifactRoot "$(dacpacName)"
-          if (-not (Test-Path $dacpacPath)) {
-            $dacFile = Get-ChildItem -Path $artifactRoot -Recurse -Filter *.dacpac | Select-Object -First 1
-            if (-not $dacFile) { throw "No .dacpac found under $artifactRoot" }
-            $dacpacPath = $dacFile.FullName
-          }
-
-          Write-Host "Using DACPAC: $dacpacPath"
-
-          $envName = "$(EnvName)"
-          switch ($envName) {
-            'sbox' { $connString = $env:FABRIC_SQL_CONNSTRING_sbox }
-            'dev'  { $connString = $env:FABRIC_SQL_CONNSTRING_dev }
-            'test' { $connString = $env:FABRIC_SQL_CONNSTRING_test }
-            'ithc' { $connString = $env:FABRIC_SQL_CONNSTRING_ithc }
-            'stg'  { $connString = $env:FABRIC_SQL_CONNSTRING_stg }
-            'prod' { $connString = $env:FABRIC_SQL_CONNSTRING_prod }
-            default { $connString = $null }
-          }
-
-          if (-not $connString) {
-            throw "Fabric SQL connection string for environment '$envName' is not set."
-          }
-
-          $blockDataLoss = "${{ parameters.blockDataLoss }}" -eq "true"
-          $dropObjects   = "${{ parameters.dropObjects }}"   -eq "true"
-          $runBootstrap  = "${{ parameters.runBootstrap }}"  -eq "true"
-
-          $args = @(
-            "/Action:Publish"
-            "/SourceFile:$dacpacPath"
-            "/TargetConnectionString:$connString"
-            "/p:AllowIncompatiblePlatform=true"
-            "/p:BlockOnPossibleDataLoss=$($blockDataLoss.ToString().ToLower())"
-          )
-
-          if ($dropObjects) { $args += "/p:DropObjectsNotInSource=true" }
-
-          $args += "/v:environment=$envName"
-          $args += "/v:Version=$(Build.BuildNumber)"
-
-          & $sqlPackagePath @args
-          if ($LASTEXITCODE -ne 0) { throw "sqlpackage failed with exit code $LASTEXITCODE" }
-
-      env:
-        FABRIC_SQL_CONNSTRING_sbox: $(FABRIC_SQL_CONNSTRING_sbox)
-        FABRIC_SQL_CONNSTRING_dev:  $(FABRIC_SQL_CONNSTRING_dev)
-        FABRIC_SQL_CONNSTRING_test: $(FABRIC_SQL_CONNSTRING_test)
-        FABRIC_SQL_CONNSTRING_ithc: $(FABRIC_SQL_CONNSTRING_ithc)
-        FABRIC_SQL_CONNSTRING_stg:  $(FABRIC_SQL_CONNSTRING_stg)
-        FABRIC_SQL_CONNSTRING_prod: $(FABRIC_SQL_CONNSTRING_prod)
+    deployPoolName: ${{ variables.prodPoolName }}
