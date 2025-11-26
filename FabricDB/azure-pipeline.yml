@@ -98,7 +98,23 @@ stages:
         downloadType: 'single'
         artifactName: '$(artifactName)'
         downloadPath: '$(Pipeline.Workspace)'
+   # 1) Install .NET 8 RUNTIME (what sqlpackage needs)
+    - task: UseDotNet@2
+      displayName: 'Install .NET 8 runtime for sqlpackage'
+      inputs:
+        packageType: 'runtime'
+        version: '8.0.x'          # any 8.0.* is fine, SDK will roll patch forward
+        includePreviewVersions: true
 
+    # 2) (optional but useful) show which dotnet we're actually using
+    - task: PowerShell@2
+      displayName: 'Show dotnet info'
+      inputs:
+        targetType: 'inline'
+        script: |
+          dotnet --info
+          dotnet --list-runtimes
+          
     - task: PowerShell@2
       displayName: 'Install SqlPackage (.NET global tool)'
       inputs:
