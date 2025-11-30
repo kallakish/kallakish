@@ -1,0 +1,19 @@
+# List outbound rules that mention 1433
+Get-NetFirewallRule -Direction Outbound |
+  Get-NetFirewallPortFilter |
+  Where-Object { $_.Protocol -eq 'TCP' -and $_.LocalPort -eq 1433 -or $_.RemotePort -eq 1433 } |
+  Format-List *
+
+
+New-NetFirewallRule `
+  -DisplayName "Allow outbound SQL 1433" `
+  -Direction Outbound `
+  -Protocol TCP `
+  -RemotePort 1433 `
+  -Action Allow
+
+
+Test-NetConnection <your-server>.database.windows.net -Port 1433
+# or .database.fabric.microsoft.com
+
+
