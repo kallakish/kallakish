@@ -282,3 +282,38 @@ config_override = {
       & .\.venv\Scripts\python.exe -u .\.deploy\fabric_workspace.py `
         --environment $(ENVIRONMENT) `
         --workspace_id_dev $(WORKSPACE_ID_DEV)
+
+
+
+// 2 pass deployment very important:
+
+
+# PASS 1 — anchors (creates the things others depend on)
+- powershell: |
+    & "C:\Program Files\Python312\python.exe" azure-pipelines\.deploy\deploy.py `
+      --workspace-id $(TEST_WORKSPACE_ID) `
+      --environment TEST `
+      --repo-dir "$(Build.SourcesDirectory)\workspaces\<your-workspace>" `
+      --items-in-scope "Lakehouse,Warehouse,KQLDatabase,Environment,SemanticModel"
+  displayName: 'TEST Pass 1: anchors'
+  env:
+    AZURE_CLIENT_ID: $(FABRIC_CLIENT_ID)
+    AZURE_TENANT_ID: $(FABRIC_TENANT_ID)
+    AZURE_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+
+# PASS 2 — dependents (pipelines, notebooks, reports)
+- powershell: |
+    & "C:\Program Files\Python312\python.exe" azure-pipelines\.deploy\deploy.py `
+      --workspace-id $(TEST_WORKSPACE_ID) `
+      --environment TEST `
+      --repo-dir "$(Build.SourcesDirectory)\workspaces\<your-workspace>" `
+      --items-in-scope "DataPipeline,Notebook,Report"
+  displayName: 'TEST Pass 2: dependents'
+  env:
+    AZURE_CLIENT_ID: $(FABRIC_CLIENT_ID)
+    AZURE_TENANT_ID: $(FABRIC_TENANT_ID)
+    AZURE_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+    # any secrets your parameter.yml references via $env:
+    SQL_USERNAME_TEST: $(SQL_USERNAME_TEST)
+    SQL_PASSWORD_TEST: $(SQL_PASSWORD_TEST)
+
