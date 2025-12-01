@@ -4,3 +4,21 @@ key_value_replace:
       dev: "00000000-0000-0000-0000-0000000000AA"
       test: "00000000-0000-0000-0000-0000000000BB"
     item_type: "DataPipeline"
+
+# workspaces/workspace_alpha/parameter.yml
+key_value_replace:
+  # If your Copy uses a Connection GUID on the source:
+  - find_key: $.properties.activities[?(@.name=="Copy Data")].typeProperties.source.datasetSettings.externalReferences.connection
+    replace_value:
+      DEV:  "db52be81-c2b2-4261-84fa-840c67f4bbd0"   # use DEV connection in DEV
+      TEST: "db52be81-c2b2-4261-84fa-840c67f4bbd0"   # intentionally same as DEV in TEST
+    item_type: "DataPipeline"
+    item_name: "Your Pipeline Name"
+
+  # If the sink also uses a Connection GUID, add this too:
+  - find_key: $.properties.activities[?(@.name=="Copy Data")].typeProperties.sink.datasetSettings.externalReferences.connection
+    replace_value:
+      DEV:  "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+      TEST: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+    item_type: "DataPipeline"
+    item_name: "Your Pipeline Name"
