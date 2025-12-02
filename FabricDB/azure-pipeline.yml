@@ -223,3 +223,41 @@ stages:
         FABRIC_SQL_CONNSTRING_ithc: $(FABRIC_SQL_CONNSTRING_ithc)
         FABRIC_SQL_CONNSTRING_stg:  $(FABRIC_SQL_CONNSTRING_stg)
         FABRIC_SQL_CONNSTRING_prod: $(FABRIC_SQL_CONNSTRING_prod)
+
+
+
+SPN connection test
+
+        - task: PowerShell@2
+  displayName: 'Debug: test SQL connection with SqlClient'
+  inputs:
+    targetType: 'inline'
+    script: |
+      $connString = $env:FABRIC_SQL_CONNSTRING_dev   # or use $(FABRIC_SQL_CONNSTRING_dev) directly
+
+      if (-not $connString) {
+        Write-Error "FABRIC_SQL_CONNSTRING_dev is empty. Aborting."
+        exit 1
+      }
+
+      Write-Host "Testing SqlClient connection (without printing secrets)..."
+
+      Add-Type -AssemblyName "System.Data"
+      $conn = New-Object System.Data.SqlClient.SqlConnection $connString
+
+      try {
+        $conn.Open()
+        Write-Host "✅ Successfully connected to SQL Server and opened the database."
+      }
+      catch {
+        Write-Error "❌ Failed to connect using SqlClient. Top-level message:"
+        Write-Error $_.Exception.Message
+        Write-Error ""
+        Write-Error "Full exception (for deep details):"
+        Write-Error $_.Exception.ToString()
+        exit 1
+      }
+      finally {
+        if ($conn.State -eq 'Open') { $conn.Close() }
+      }
+
