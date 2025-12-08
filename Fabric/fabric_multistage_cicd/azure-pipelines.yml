@@ -317,3 +317,33 @@ config_override = {
     SQL_USERNAME_TEST: $(SQL_USERNAME_TEST)
     SQL_PASSWORD_TEST: $(SQL_PASSWORD_TEST)
 
+
+
+
+
+#Check the 
+
+
+- task: AzureCLI@2
+  displayName: 'Ensure RBAC on capacity + workspaces'
+  inputs:
+    azureSubscription: 'your-service-connection'   # SPN with required permissions
+    scriptType: ps
+    scriptLocation: inlineScript
+    inlineScript: |
+      $py = 'C:\Program Files\Python312\python.exe'
+      & $py -m pip install -U pip requests azure-identity
+
+      # env for ARM
+      $env:AZ_SUBSCRIPTION_ID = '$(AZ_SUBSCRIPTION_ID)'
+      $env:AZ_RESOURCE_GROUP  = '$(AZ_RESOURCE_GROUP)'
+
+      # (optional) explicit SPN; otherwise DefaultAzureCredential uses the service connection login
+      # $env:TENANT_ID = '$(TENANT_ID)'
+      # $env:CLIENT_ID = '$(CLIENT_ID)'
+      # $env:CLIENT_SECRET = '$(CLIENT_SECRET)'
+
+      # path to your JSON file (checked into repo)
+      $env:RBAC_PARAMS_FILE = 'capacity-admins.json'
+
+      & $py -u .\.deploy\ensure_rbac.py
