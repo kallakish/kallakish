@@ -146,3 +146,32 @@ jobs:
         }
 
         Write-Host "All workspaces from config processed."
+
+
+
+
+
+        The below used for checking admn object for existing ones :
+
+        - task: AzureCLI@2
+  displayName: 'Ensure workspace RBAC via Python'
+  inputs:
+    azureSubscription: 'your-service-connection'   # uses this SPN to get the Power BI token
+    scriptType: ps
+    scriptLocation: inlineScript
+    inlineScript: |
+      $py = 'C:\Program Files\Python312\python.exe'
+      if (-not (Test-Path $py)) { $py = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe" }
+      & $py -m pip install -U pip requests azure-identity
+
+      # Path to your JSON (mix UPNs + SPN objectIds)
+      $env:WORKSPACE_RBAC_FILE = "$(Build.SourcesDirectory)\infra\workspace-rbac.json"
+
+      # Optional: force a specific SPN instead of the service connection identity:
+      # $env:TENANT_ID = "$(TENANT_ID)"
+      # $env:CLIENT_ID = "$(CLIENT_ID)"
+      # $env:CLIENT_SECRET = "$(CLIENT_SECRET)"
+
+      # Run the script you added at .deploy/ensure_workspace_rbac.py
+      & $py -u .\.deploy\ensure_workspace_rbac.py
+
