@@ -122,36 +122,17 @@
         param([string]$WorkspaceName, [string[]]$Admins)
       
         if (-not $Admins -or $Admins.Count -eq 0) { return }
-      
         $Admins = $Admins | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ } | Select-Object -Unique
-        $guidRe  = '^[0-9a-fA-F-]{8}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{12}$'
-        $emailRe = '^[^@\s]+@[^@\s]+\.[^@\s]+$'
       
-        foreach ($a in $Admins) {
-          if ($a -match $emailRe) {
-            # User by UPN/email
-            Write-Host "    - ensuring Admin (User) '$a' on '$WorkspaceName'..."
-            & $fabPath acl set "$WorkspaceName.Workspace" -I $a -T User -R admin -f
-            if ($LASTEXITCODE -ne 0) { Write-Warning "      add (User) failed for '$a' (exit $LASTEXITCODE)" }
-            continue
+        foreach ($id in $Admins) {
+          Write-Host "    - ensuring Admin '$id' on '$WorkspaceName'..."
+          & $fabPath acl set "$WorkspaceName.Workspace" -I $id -R admin -f
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "      fab acl set failed for '$id' (exit $LASTEXITCODE) — continuing"
           }
-          if ($a -match $guidRe) {
-            # Try SPN (App) first, then Group
-            Write-Host "    - ensuring Admin (App/Group) '$a' on '$WorkspaceName'..."
-            & $fabPath acl set "$WorkspaceName.Workspace" -I $a -T App -R admin -f
-            if ($LASTEXITCODE -ne 0) {
-              Write-Host "      App failed; retry as Group..."
-              & $fabPath acl set "$WorkspaceName.Workspace" -I $a -T Group -R admin -f
-              if ($LASTEXITCODE -ne 0) { Write-Warning "      add (Group) failed for '$a' (exit $LASTEXITCODE)" }
-            }
-            continue
-          }
-          # Fallback: treat as User
-          Write-Host "    - ensuring Admin (User fallback) '$a' on '$WorkspaceName'..."
-          & $fabPath acl set "$WorkspaceName.Workspace" -I $a -T User -R admin -f
-          if ($LASTEXITCODE -ne 0) { Write-Warning "      add (User fallback) failed for '$a' (exit $LASTEXITCODE)" }
         }
       }
+
 
 
 
