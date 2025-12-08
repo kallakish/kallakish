@@ -116,12 +116,7 @@
       if (-not (Test-Path $configPath)) { throw "Config file not found: $configPath" }
 
       # helper: idempotently ensure Admins (UPN or SPN objectId)
-      function Resolve-UPN {
-        param([string]$maybeEmail)
-        # Try to normalize to the tenant UPN (handles aliases)
-        $res = az ad user show --id $maybeEmail --query userPrincipalName -o tsv 2>$null
-        if ($LASTEXITCODE -eq 0 -and $res) { return $res } else { return $maybeEmail }
-      }
+      
       
       function Ensure-WorkspaceAdmins {
         param([string]$WorkspaceName, [string[]]$Admins)
@@ -129,47 +124,35 @@
         if (-not $Admins -or $Admins.Count -eq 0) { return }
       
         $Admins = $Admins | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ } | Select-Object -Unique
-        $guidRe  = '^[0-9a-fA-F-]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        $guidRe  = '^[0-9a-fA-F-]{8}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{12}$'
         $emailRe = '^[^@\s]+@[^@\s]+\.[^@\s]+$'
       
         foreach ($a in $Admins) {
-          $principalType = $null
-          $idToUse = $a
-      
           if ($a -match $emailRe) {
-            # Users: normalize to actual UPN in Entra to avoid alias issues
-            $idToUse = Resolve-UPN $a
-            $principalType = 'User'
-          } elseif ($a -match $guidRe) {
-            # GUID could be App (SPN) or Group; try App first, then Group
-            $principalType = 'App'
-          } else {
-            # Fallback: try as User, then Group
-            $principalType = 'User'
+            # User by UPN/email
+            Write-Host "    - ensuring Admin (User) '$a' on '$WorkspaceName'..."
+            & $fabPath acl set "$WorkspaceName.Workspace" -I $a -T User -R admin -f
+            if ($LASTEXITCODE -ne 0) { Write-Warning "      add (User) failed for '$a' (exit $LASTEXITCODE)" }
+            continue
           }
-      
-          Write-Host "    - ensuring Admin '$a' (as '$idToUse', type $principalType) on '$WorkspaceName'..."
-          & $fabPath acl set "$WorkspaceName.Workspace" -I $idToUse -T $principalType -R admin -f
-          $code = $LASTEXITCODE
-      
-          if ($code -ne 0 -and $a -match $guidRe -and $principalType -eq 'App') {
-            # maybe it was a Group objectId
-            Write-Host "      App failed; retrying as Group for '$a'..."
-            & $fabPath acl set "$WorkspaceName.Workspace" -I $a -T Group -R admin -f
-            $code = $LASTEXITCODE
+          if ($a -match $guidRe) {
+            # Try SPN (App) first, then Group
+            Write-Host "    - ensuring Admin (App/Group) '$a' on '$WorkspaceName'..."
+            & $fabPath acl set "$WorkspaceName.Workspace" -I $a -T App -R admin -f
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "      App failed; retry as Group..."
+              & $fabPath acl set "$WorkspaceName.Workspace" -I $a -T Group -R admin -f
+              if ($LASTEXITCODE -ne 0) { Write-Warning "      add (Group) failed for '$a' (exit $LASTEXITCODE)" }
+            }
+            continue
           }
-          if ($code -ne 0 -and $principalType -eq 'User') {
-            # try Group as a last resort (for named groups passed as string)
-            Write-Host "      User failed; retrying as Group for '$a'..."
-            & $fabPath acl set "$WorkspaceName.Workspace" -I $a -T Group -R admin -f
-            $code = $LASTEXITCODE
-          }
-      
-          if ($code -ne 0) {
-            Write-Warning "      Failed to add '$a' to '$WorkspaceName' (exit $code)."
-          }
+          # Fallback: treat as User
+          Write-Host "    - ensuring Admin (User fallback) '$a' on '$WorkspaceName'..."
+          & $fabPath acl set "$WorkspaceName.Workspace" -I $a -T User -R admin -f
+          if ($LASTEXITCODE -ne 0) { Write-Warning "      add (User fallback) failed for '$a' (exit $LASTEXITCODE)" }
         }
       }
+
 
 
       # 1) Snapshot existing workspace names via 'fab ls'
