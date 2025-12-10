@@ -1,0 +1,47 @@
+Subject: Request Conditional Access exception (Named Location) for DevOps agent – blocking Fabric SQL deployment
+
+Hi <Team>,
+
+I’m working on the SQL deployment pipeline for our Metadata Framework (MDF) on Fabric and we’ve hit a hard blocker with Conditional Access on our Azure DevOps self-hosted agent server.
+
+From that server:
+
+Interactive sign-in to Azure / Azure Data Studio shows:
+“Your sign-in was successful but does not meet the criteria to access the resource.”
+
+Microsoft Entra sign-in logs for these attempts show:
+Failure reason: “The access policy does not allow token issuance, require multifactor authentication failure.”
+
+These sign-ins are targeting Azure SQL Database / Fabric SQL, which is configured as Azure AD only (SQL logins disabled).
+
+Because our Fabric SQL deployment uses an Azure AD service principal (client ID + secret) from this DevOps agent, and service principals cannot perform MFA, the current Conditional Access policy is preventing tokens from being issued and the SQL deployment to Fabric is failing.
+
+I’ve attached a screenshot of the failed sign-in from the Entra sign-in logs for reference.
+
+Request
+
+Preferred option:
+
+Could you please:
+
+Add the DevOps agent public IP as a Named location, and
+
+Exclude that Named location from the Conditional Access policy that is currently requiring MFA (and blocking token issuance) for these Azure SQL / Fabric sign-ins?
+
+Details:
+
+DevOps agent server: <ServerName>
+
+Public/NAT IP: <Public IP or range>
+
+Resource being accessed: Azure SQL Database / Fabric SQL (MDF)
+
+This would allow the DevOps agent to obtain tokens for the Fabric SQL deployment, while keeping the existing Conditional Access posture for normal user sign-ins.
+
+If adding a Named Location exception isn’t possible from a security perspective, could we please discuss alternative options (for example, a different pattern for exempting this specific service principal or agent from MFA) so we can unblock the MDF deployment?
+
+Thanks a lot for your help with this.
+
+Best regards,
+<Your Name>
+<Your Team / Role>
