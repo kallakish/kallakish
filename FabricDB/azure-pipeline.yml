@@ -261,3 +261,47 @@ SPN connection test
         if ($conn.State -eq 'Open') { $conn.Close() }
       }
 
+
+
+
+
+
+      - task: PowerShell@2
+  displayName: 'Pre-flight: test Fabric SQL connection (dev)'
+  inputs:
+    targetType: 'inline'
+    script: |
+      # Use Microsoft.Data.SqlClient (supports AAD Service Principal auth)
+      Add-Type -AssemblyName "Microsoft.Data.SqlClient"
+
+      $connString = "$(FABRIC_SQL_CONNSTRING_dev)"
+
+      if (-not $connString -or $connString -like '$(FABRIC_SQL_CONNSTRING*') {
+        Write-Error "Connection string variable FABRIC_SQL_CONNSTRING_dev is not set or not expanded."
+        exit 1
+      }
+
+      # Log a sanitised version so we can see it's correct
+      $safe = $connString `
+        -replace "User Id=[^;]*","User Id=***" `
+        -replace "Password=[^;]*","Password=***"
+      Write-Host "Using connection string (sanitised): $safe"
+
+      $conn = New-Object Microsoft.Data.SqlClient.SqlConnection $connString
+
+      try {
+        Write-Host "Attempting to open Fabric SQL connection..."
+        $conn.Open()
+        Write-Host "✅ Successfully connected to Fabric SQL (dev)."
+      }
+      catch {
+        Write-Error "❌ Failed to connect to Fabric SQL (dev)."
+        Write-Error $_.Exception.Message
+        Write-Error $_.Exception.ToString()
+        exit 1
+      }
+      finally {
+        if ($conn.State -eq 'Open') { $conn.Close() }
+      }
+
+
