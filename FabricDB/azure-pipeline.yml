@@ -304,4 +304,40 @@ SPN connection test
         if ($conn.State -eq 'Open') { $conn.Close() }
       }
 
+# 1) Make sure .NET is available on the agent
+- task: UseDotNet@2
+  displayName: 'Install .NET 8 SDK'
+  inputs:
+    packageType: 'sdk'
+    version: '8.0.x'
+    includePreviewVersions: true
+
+# 2) Quick Fabric SQL connection test using your connection string
+- task: PowerShell@2
+  displayName: 'Quick SQL connection test'
+  inputs:
+    targetType: 'inline'
+    script: |
+      # Show dotnet info (just to confirm it's installed)
+      Write-Host "=== dotnet --info ==="
+      dotnet --info
+
+      # Simple SQL connection test
+      Add-Type -AssemblyName "System.Data"
+      $cs = "$(FABRIC_SQL_CONNSTRING_dev)"   # make sure this variable is defined
+      $conn = New-Object System.Data.SqlClient.SqlConnection $cs
+
+      try {
+        Write-Host "Attempting DB connection..."
+        $conn.Open()
+        Write-Host "✅ Connected to DB."
+      }
+      catch {
+        Write-Error "❌ Failed to connect to DB:"
+        Write-Error $_.Exception.Message
+        exit 1
+      }
+      finally {
+        if ($conn.State -eq 'Open') { $conn.Close() }
+      }
 
