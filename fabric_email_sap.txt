@@ -1,0 +1,19 @@
+Hi <Admin Name>,
+
+We’re setting up Microsoft Fabric (Data Factory) to extract data from SAP using the SAP Table connector via our On-premises Data Gateway. The gateway is failing with:
+
+“The assembly sapnco could not be found, please ensure the SAP Connector for Microsoft .NET 3.0 is installed in your GAC…”
+
+To resolve this, we need the SAP .NET Connector (NCo) installed on the gateway server (64-bit) and added to the Windows GAC.
+
+Could you please either:
+
+Provide me an SAP Support Portal user with Software Download authorization (S-user), or
+
+Download the installer on our behalf and share it internally:
+
+SAP Connector for Microsoft .NET (NCo) 3.1, 64-bit for Windows (includes sapnco.dll / sapnco_utils.dll)
+
+Once downloaded, we will install it on the gateway machine(s) and restart the gateway service.
+
+Thanks,
