@@ -54,3 +54,18 @@ catch {
 finally {
     if ($conn.State -eq 'Open') { $conn.Close() }
 }
+
+
+Test the server connection Devops to fabric DB
+
+$server = "xxxxx.database.fabric.microsoft.com"   # your Fabric SQL host
+
+# You already know 1433 works, but re-check for completeness
+Test-NetConnection -ComputerName $server -Port 1433
+
+# Now test some redirect ports
+11000,11010,11050,11100 | ForEach-Object {
+  Write-Host "Testing port $_ ..."
+  Test-NetConnection -ComputerName $server -Port $_
+}
+
