@@ -1,0 +1,32 @@
+We’re trying to do CI/CD to a Fabric SQL Database from Azure DevOps using a Microsoft Entra Service Principal and sqlpackage (DACPAC publish).
+
+The target is a Fabric SQL DB, not classic Azure SQL.
+
+We connect with:
+Authentication=Active Directory Service Principal; User Id=<app client ID>; Password=<client secret>.
+
+Permissions side:
+
+The service principal is:
+
+Admin/Contributor on the Fabric workspace and the SQL Database item.
+
+A database user in the Fabric SQL DB and in the db_owner role.
+
+In Fabric / Power BI tenant settings, service principals are enabled and this SPN (or its group) is allowed.
+
+In Entra sign-in logs (Workload identity sign-ins), the SPN’s sign-ins to Azure SQL Database show Status = Success.
+
+Network side:
+
+From the DevOps agent server:
+
+Test-NetConnection <server>.database.fabric.microsoft.com -Port 1433 succeeds.
+
+Test-NetConnection <server>.database.fabric.microsoft.com -Port 11000–11999 fails / times out.
+
+When we run sqlpackage /Action:Publish from that agent, we get:
+
+“A connection was successfully established with the server, but then an error occurred during the login process (provider: TCP Provider, error: 0 - An existing connection was forcibly closed by the remote host).”
+
+From another machine (not the DevOps agent), we can connect to the same Fabric SQL DB using Entra user auth (our own accounts) and query successfully.
