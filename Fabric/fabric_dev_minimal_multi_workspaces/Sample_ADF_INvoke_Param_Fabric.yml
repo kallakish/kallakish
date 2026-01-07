@@ -1,0 +1,24 @@
+key_value_replace:
+  # PL_SAP_ADF uses a Web activity that calls the ADF createRun API
+  - find_key: >-
+      $.properties.activities[?(@.type=='Web' && @.name=='Invoke ADF')].typeProperties.connection
+    replace_value:
+      Dev:  "00000000-0000-0000-0000-000000000DEV"   # REST conn GUID for Dev
+      Test: "11111111-1111-1111-1111-111111111TEST" # REST conn GUID for Test
+      UAT:  "22222222-2222-2222-2222-222222222UAT"
+      Prod: "33333333-3333-3333-3333-333333333PROD"
+    item_type: "DataPipeline"
+    item_name: "PL_SAP_ADF"
+
+
+
+key_value_replace:
+  - find_key: >-
+      $.properties.activities[?(@.name=='Invoke ADF')].typeProperties.datasetSettings.externalReferences.connection
+    replace_value:
+      Dev:  "00000000-0000-0000-0000-000000000DEV"
+      Test: "11111111-1111-1111-1111-111111111TEST"
+      UAT:  "22222222-2222-2222-2222-222222222UAT"
+      Prod: "33333333-3333-3333-3333-333333333PROD"
+    item_type: "DataPipeline"
+    item_name: "PL_SAP_ADF"
