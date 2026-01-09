@@ -1,0 +1,36 @@
+parameters:
+  artifactName: drop
+  armTemplatePath: ARMTemplateForFactory.json
+  azureServiceConnection: ''
+  subscriptionId: ''
+  resourceGroupName: ''
+  location: ''
+  parametersFile: ''  # e.g. $(Pipeline.Workspace)/drop/params/dev.json
+
+steps:
+- download: current
+  artifact: ${{ parameters.artifactName }}
+
+- task: PowerShell@2
+  displayName: Prepare ARM (remove IR)
+  inputs:
+    pwsh: true
+    targetType: filePath
+    filePath: scripts/adf/remove-ir-from-arm.ps1
+    arguments: >
+      -InTemplate "$(Pipeline.Workspace)/${{ parameters.artifactName }}/${{ parameters.armTemplatePath }}"
+      -OutTemplate "$(Pipeline.Workspace)/${{ parameters.artifactName }}/ARMTemplateForFactory.noir.json"
+
+- task: AzureResourceManagerTemplateDeployment@3
+  displayName: ARM Deploy ADF (IR skipped)
+  inputs:
+    deploymentScope: Resource Group
+    azureResourceManagerConnection: ${{ parameters.azureServiceConnection }}
+    subscriptionId: ${{ parameters.subscriptionId }}
+    action: Create Or Update Resource Group
+    resourceGroupName: ${{ parameters.resourceGroupName }}
+    location: ${{ parameters.location }}
+    templateLocation: Linked artifact
+    csmFile: "$(Pipeline.Workspace)/${{ parameters.artifactName }}/ARMTemplateForFactory.noir.json"
+    csmParametersFile: ${{ parameters.parametersFile }}
+    deploymentMode: Incremental
