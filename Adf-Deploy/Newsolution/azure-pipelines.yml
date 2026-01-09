@@ -1,0 +1,34 @@
+stages:
+- stage: Build
+  jobs:
+  - job: Build
+    steps:
+    # your existing build/export steps
+    - publish: $(Build.ArtifactStagingDirectory)
+      artifact: drop
+
+- stage: Deploy_Dev
+  dependsOn: Build
+  jobs:
+  - job: Dev
+    steps:
+    - template: templates/adf/deploy-adf-skip-ir.yml
+      parameters:
+        azureServiceConnection: $(serviceConnection)
+        subscriptionId: $(subscriptionId)
+        resourceGroupName: $(devRg)
+        location: $(location)
+        parametersFile: "$(Pipeline.Workspace)/drop/params/dev.json"
+
+- stage: Deploy_Test
+  dependsOn: Build
+  jobs:
+  - job: Test
+    steps:
+    - template: templates/adf/deploy-adf-skip-ir.yml
+      parameters:
+        azureServiceConnection: $(serviceConnection)
+        subscriptionId: $(subscriptionId)
+        resourceGroupName: $(testRg)
+        location: $(location)
+        parametersFile: "$(Pipeline.Workspace)/drop/params/test.json"
