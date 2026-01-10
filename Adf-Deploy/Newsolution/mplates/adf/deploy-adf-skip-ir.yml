@@ -25,6 +25,15 @@ steps:
     "$(Pipeline.Workspace)/${{ parameters.artifactName }}/ARMTemplateForFactory.noir.json"
   displayName: Prepare ARM (remove IR)
 
+  - task: PowerShell@2
+  displayName: List ARM files
+  inputs:
+    pwsh: false
+    targetType: inline
+    script: |
+      dir "$(Pipeline.Workspace)\arm"
+
+
 - task: AzureResourceManagerTemplateDeployment@3
   displayName: ARM Deploy ADF (IR skipped)
   inputs:
