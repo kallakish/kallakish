@@ -1,34 +1,58 @@
+trigger:
+- main
+
+variables:
+  serviceConnection: 'YOUR-AZURE-SERVICE-CONNECTION'
+  subscriptionId: '00000000-0000-0000-0000-000000000000'
+  location: 'uksouth'
+
+  devRg:  'rg-adf-dev'
+  testRg: 'rg-adf-test'
+
 stages:
 - stage: Build
+  displayName: Build (export ARM)
   jobs:
   - job: Build
     steps:
-    # your existing build/export steps
-    - publish: $(Build.ArtifactStagingDirectory)
-      artifact: drop
+    - checkout: self
+
+    # ---- YOUR EXISTING "export ARM templates" steps are here ----
+    # Make sure the exported files end up in: $(Build.ArtifactStagingDirectory)/arm/
+    # and include ARMTemplateForFactory.json
+
+    - task: PublishPipelineArtifact@1
+      displayName: Publish ARM artifact
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/arm'
+        artifact: 'arm'
 
 - stage: Deploy_Dev
+  displayName: Deploy DEV (skip IR)
   dependsOn: Build
   jobs:
   - job: Dev
     steps:
-    - template: templates/adf/deploy-adf-skip-ir.yml
+    - template: deploy-adf-skip-ir.yml
       parameters:
+        artifactName: 'arm'
         azureServiceConnection: $(serviceConnection)
         subscriptionId: $(subscriptionId)
         resourceGroupName: $(devRg)
         location: $(location)
-        parametersFile: "$(Pipeline.Workspace)/drop/params/dev.json"
+        parametersFile: "$(Build.SourcesDirectory)/azure-pipelines/parameters/adf_mdf_dev_paramates.json"
 
 - stage: Deploy_Test
+  displayName: Deploy TEST (skip IR)
   dependsOn: Build
   jobs:
   - job: Test
     steps:
-    - template: templates/adf/deploy-adf-skip-ir.yml
+    - template: deploy-adf-skip-ir.yml
       parameters:
+        artifactName: 'arm'
         azureServiceConnection: $(serviceConnection)
         subscriptionId: $(subscriptionId)
         resourceGroupName: $(testRg)
         location: $(location)
-        parametersFile: "$(Pipeline.Workspace)/drop/params/test.json"
+        parametersFile: "$(Build.SourcesDirectory)/azure-pipelines/parameters/adf_mdf_test_paramates.json"
