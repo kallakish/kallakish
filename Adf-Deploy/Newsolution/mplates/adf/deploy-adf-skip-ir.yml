@@ -1,12 +1,12 @@
 parameters:
-  artifactName: 'arm'                 # must match what Build publishes
+  artifactName: 'arm'
   armTemplateFile: 'ARMTemplateForFactory.json'
 
   azureServiceConnection: ''
   subscriptionId: ''
   resourceGroupName: ''
   location: ''
-  parametersFile: ''                  # repo path to your env params json
+  parametersFile: ''
 
 steps:
 - checkout: self
@@ -14,15 +14,16 @@ steps:
 - download: current
   artifact: ${{ parameters.artifactName }}
 
-- task: PowerShell@2
-  displayName: Prepare ARM (remove IR)
+# Ensure python exists (works on hosted agents; safe on self-hosted too if installed)
+- task: UsePythonVersion@0
   inputs:
-    pwsh: true
-    targetType: filePath
-    filePath: scripts/adf/remove-ir-from-arm.ps1
-    arguments: >
-      -InTemplate "$(Pipeline.Workspace)/${{ parameters.artifactName }}/${{ parameters.armTemplateFile }}"
-      -OutTemplate "$(Pipeline.Workspace)/${{ parameters.artifactName }}/ARMTemplateForFactory.noir.json"
+    versionSpec: '3.x'
+
+- script: >
+    python scripts/adf/remove_ir_from_arm.py
+    "$(Pipeline.Workspace)/${{ parameters.artifactName }}/${{ parameters.armTemplateFile }}"
+    "$(Pipeline.Workspace)/${{ parameters.artifactName }}/ARMTemplateForFactory.noir.json"
+  displayName: Prepare ARM (remove IR)
 
 - task: AzureResourceManagerTemplateDeployment@3
   displayName: ARM Deploy ADF (IR skipped)
@@ -37,3 +38,4 @@ steps:
     csmFile: "$(Pipeline.Workspace)/${{ parameters.artifactName }}/ARMTemplateForFactory.noir.json"
     csmParametersFile: ${{ parameters.parametersFile }}
     deploymentMode: Incremental
+
