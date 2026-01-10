@@ -1,13 +1,16 @@
 parameters:
-  artifactName: drop
-  armTemplatePath: ARMTemplateForFactory.json
+  artifactName: 'arm'                 # must match what Build publishes
+  armTemplateFile: 'ARMTemplateForFactory.json'
+
   azureServiceConnection: ''
   subscriptionId: ''
   resourceGroupName: ''
   location: ''
-  parametersFile: ''  # e.g. $(Pipeline.Workspace)/drop/params/dev.json
+  parametersFile: ''                  # repo path to your env params json
 
 steps:
+- checkout: self
+
 - download: current
   artifact: ${{ parameters.artifactName }}
 
@@ -18,7 +21,7 @@ steps:
     targetType: filePath
     filePath: scripts/adf/remove-ir-from-arm.ps1
     arguments: >
-      -InTemplate "$(Pipeline.Workspace)/${{ parameters.artifactName }}/${{ parameters.armTemplatePath }}"
+      -InTemplate "$(Pipeline.Workspace)/${{ parameters.artifactName }}/${{ parameters.armTemplateFile }}"
       -OutTemplate "$(Pipeline.Workspace)/${{ parameters.artifactName }}/ARMTemplateForFactory.noir.json"
 
 - task: AzureResourceManagerTemplateDeployment@3
