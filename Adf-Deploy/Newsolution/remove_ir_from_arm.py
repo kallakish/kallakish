@@ -43,4 +43,14 @@ def main():
         doc["resources"] = resources
         print(f"Removed {before - after} integration runtime resource(s).")
     else:
-        print("WARNING: No top-level 'resources' list found; nothing chang
+        print("WARNING: No top-level 'resources' list found; nothing changed.")
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    # ARM is fine with minified JSON; keep it compact
+    with out_path.open("w", encoding="utf-8") as f:
+        json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))
+
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())
