@@ -56,3 +56,23 @@ stages:
         resourceGroupName: $(testRg)
         location: $(location)
         parametersFile: "$(Build.SourcesDirectory)/azure-pipelines/parameters/adf_mdf_test_paramates.json"
+
+
+
+
+
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.x'
+
+- script: >
+    python scripts/adf/remove_ir_from_arm.py
+    "$(Build.SourcesDirectory)\ArmTemplate\ARMTemplateForFactory.json"
+    "$(Build.SourcesDirectory)\ArmTemplate\ARMTemplateForFactory.noir.json"
+  displayName: Create noir template (no IR)
+
+- task: PublishPipelineArtifact@1
+  inputs:
+    targetPath: '$(Build.SourcesDirectory)\ArmTemplate'
+    artifact: 'Armtemplate'
+
