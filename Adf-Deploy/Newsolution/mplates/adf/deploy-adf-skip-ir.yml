@@ -20,10 +20,14 @@ steps:
     versionSpec: '3.x'
 
 - script: >
-    python scripts/adf/remove_ir_from_arm.py
-    "$(Pipeline.Workspace)/${{ parameters.artifactName }}/${{ parameters.armTemplateFile }}"
-    "$(Pipeline.Workspace)/${{ parameters.artifactName }}/ARMTemplateForFactory.noir.json"
-  displayName: Prepare ARM (remove IR)
+    python -c "import json; 
+    p=r'$(Build.SourcesDirectory)\ArmTemplate\ARMTemplateForFactory.json';
+    o=r'$(Build.SourcesDirectory)\ArmTemplate\ARMTemplateForFactory.noir.json';
+    d=json.load(open(p,'r',encoding='utf-8'));
+    d['resources']=[r for r in d.get('resources',[]) if str(r.get('type','')).lower()!='microsoft.datafactory/factories/integrationruntimes'];
+    json.dump(d, open(o,'w',encoding='utf-8'), ensure_ascii=False, separators=(',',':'))"
+  displayName: Create ARM template without IR
+
 
   - task: PowerShell@2
   displayName: List ARM files
