@@ -19,14 +19,13 @@ steps:
   inputs:
     versionSpec: '3.x'
 
-- script: >
-    python -c "import json; 
-    p=r'$(Build.SourcesDirectory)\ArmTemplate\ARMTemplateForFactory.json';
-    o=r'$(Build.SourcesDirectory)\ArmTemplate\ARMTemplateForFactory.noir.json';
-    d=json.load(open(p,'r',encoding='utf-8'));
-    d['resources']=[r for r in d.get('resources',[]) if str(r.get('type','')).lower()!='microsoft.datafactory/factories/integrationruntimes'];
-    json.dump(d, open(o,'w',encoding='utf-8'), ensure_ascii=False, separators=(',',':'))"
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.x'
+
+- script: python -c "import json,sys; p=sys.argv[1]; o=sys.argv[2]; d=json.load(open(p,'r',encoding='utf-8')); d['resources']=[r for r in d.get('resources',[]) if str(r.get('type','')).lower()!='microsoft.datafactory/factories/integrationruntimes']; json.dump(d, open(o,'w',encoding='utf-8'), ensure_ascii=False, separators=(',',':'))" "$(Build.SourcesDirectory)/ArmTemplate/ARMTemplateForFactory.json" "$(Build.SourcesDirectory)/ArmTemplate/ARMTemplateForFactory.noir.json"
   displayName: Create ARM template without IR
+
 
 
   - task: PowerShell@2
