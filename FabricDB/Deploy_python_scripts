@@ -1,0 +1,52 @@
+# --- pipeline will override these ---
+sql_file_name = "001_create_schema.sql"          # just the file name
+sql_files_folder = "/lakehouse/default/Files/dbscripts"  # folder containing .sql files
+target_workspace_id = ""                         # optional; blank = current workspace
+target_sqldb_name_or_id = "MyFabricSqlDb"        # SQL Database item name (or id)
+
+
+
+
+import re
+import notebookutils
+
+# Resolve workspace (use current workspace if pipeline didn't pass one)
+if not target_workspace_id:
+    target_workspace_id = notebookutils.runtime.context["currentWorkspaceId"]  # :contentReference[oaicite:2]{index=2}
+
+# Connect to Fabric SQL Database
+# Doc shows connect_to_artifact can be used to query SQL database too. :contentReference[oaicite:3]{index=3}
+conn = notebookutils.data.connect_to_artifact(
+    target_sqldb_name_or_id,
+    target_workspace_id
+)
+
+print("Connected to workspace:", target_workspace_id)
+print("Connected to SQL DB:", target_sqldb_name_or_id)
+
+
+# Build full path to the SQL file
+sql_path = f"{sql_files_folder.rstrip('/')}/{sql_file_name}"
+
+# Read file content
+with open(sql_path, "r", encoding="utf-8") as f:
+    sql_text = f.read()
+
+# Split script into batches on lines containing only "GO"
+batches = [
+    b.strip()
+    for b in re.split(r"^\s*GO\s*$", sql_text, flags=re.IGNORECASE | re.MULTILINE)
+    if b.strip()
+]
+
+print(f"Executing {len(batches)} batch(es) from {sql_file_name} ...")
+
+# Execute each batch in order
+for i, batch in enumerate(batches, start=1):
+    try:
+        conn.query(batch)   # works for statements; SELECT returns a dataframe :contentReference[oaicite:5]{index=5}
+        print(f"  OK batch {i}/{len(batches)}")
+    except Exception as e:
+        raise RuntimeError(f"Failed batch {i}/{len(batches)} in {sql_file_name}:\n{e}")
+
+print("Done.")
