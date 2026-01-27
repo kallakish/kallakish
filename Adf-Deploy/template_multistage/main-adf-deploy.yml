@@ -2,12 +2,12 @@ trigger: none
 
 variables:
   armPath: 'adf/ARMTemplate'
+  paramPath: 'adf/ARMTemplate/parameters'
   location: 'East US'
   azureSubscription: 'Azure-Service-Connection'
 
 stages:
 
-# 🔹 DEV
 - template: templates/adf-deploy-stage.yml
   parameters:
     stageName: Dev
@@ -16,8 +16,8 @@ stages:
     dataFactoryName: adf-dev
     location: $(location)
     armTemplatePath: $(armPath)
+    parameterFilePath: '$(paramPath)/dev.parameters.json'
 
-# 🔹 TEST
 - template: templates/adf-deploy-stage.yml
   parameters:
     stageName: Test
@@ -26,8 +26,8 @@ stages:
     dataFactoryName: adf-test
     location: $(location)
     armTemplatePath: $(armPath)
+    parameterFilePath: '$(paramPath)/test.parameters.json'
 
-# 🔹 UAT
 - template: templates/adf-deploy-stage.yml
   parameters:
     stageName: UAT
@@ -36,8 +36,8 @@ stages:
     dataFactoryName: adf-uat
     location: $(location)
     armTemplatePath: $(armPath)
+    parameterFilePath: '$(paramPath)/uat.parameters.json'
 
-# 🔹 PROD
 - template: templates/adf-deploy-stage.yml
   parameters:
     stageName: Prod
@@ -46,3 +46,4 @@ stages:
     dataFactoryName: adf-prod
     location: $(location)
     armTemplatePath: $(armPath)
+    parameterFilePath: '$(paramPath)/prod.parameters.json'
