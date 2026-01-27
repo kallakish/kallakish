@@ -1,6 +1,3 @@
---- reusable
-
-
 parameters:
 - name: stageName
   type: string
@@ -14,23 +11,24 @@ parameters:
   type: string
 - name: armTemplatePath
   type: string
+- name: parameterFilePath
+  type: string
 
 stages:
 - stage: ${{ parameters.stageName }}
   displayName: Deploy to ${{ parameters.stageName }}
   jobs:
   - job: DeployADF
-    displayName: ADF Deployment
     pool:
-      vmImage: 'windows-latest'
+      vmImage: windows-latest
 
     steps:
     - checkout: self
       clean: true
 
-    # 🔒 Remove Integration Runtime (shared & pre-existing)
+    # 🔒 Remove Integration Runtime
     - task: PowerShell@2
-      displayName: Remove Integration Runtime from ARM
+      displayName: Remove Integration Runtime
       inputs:
         targetType: inline
         script: |
@@ -43,16 +41,15 @@ stages:
 
     # 🚀 ARM Deployment
     - task: AzureResourceManagerTemplateDeployment@3
-      displayName: Deploy ADF ARM Template
+      displayName: Deploy ADF
       inputs:
         deploymentScope: Resource Group
         azureResourceManagerConnection: ${{ parameters.azureSubscription }}
-        action: Create Or Update Resource Group
         resourceGroupName: ${{ parameters.resourceGroupName }}
         location: ${{ parameters.location }}
         templateLocation: Linked artifact
         csmFile: '$(System.DefaultWorkingDirectory)/${{ parameters.armTemplatePath }}/ARMTemplateForFactory.json'
-        csmParametersFile: '$(System.DefaultWorkingDirectory)/${{ parameters.armTemplatePath }}/ARMTemplateParametersForFactory.json'
+        csmParametersFile: '$(System.DefaultWorkingDirectory)/${{ parameters.parameterFilePath }}'
         deploymentMode: Incremental
         overrideParameters: |
           -factoryName ${{ parameters.dataFactoryName }}
