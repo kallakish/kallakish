@@ -1,0 +1,58 @@
+--- reusable
+
+
+parameters:
+- name: stageName
+  type: string
+- name: azureSubscription
+  type: string
+- name: resourceGroupName
+  type: string
+- name: dataFactoryName
+  type: string
+- name: location
+  type: string
+- name: armTemplatePath
+  type: string
+
+stages:
+- stage: ${{ parameters.stageName }}
+  displayName: Deploy to ${{ parameters.stageName }}
+  jobs:
+  - job: DeployADF
+    displayName: ADF Deployment
+    pool:
+      vmImage: 'windows-latest'
+
+    steps:
+    - checkout: self
+      clean: true
+
+    # 🔒 Remove Integration Runtime (shared & pre-existing)
+    - task: PowerShell@2
+      displayName: Remove Integration Runtime from ARM
+      inputs:
+        targetType: inline
+        script: |
+          $armFile = "$(System.DefaultWorkingDirectory)/${{ parameters.armTemplatePath }}/ARMTemplateForFactory.json"
+          $json = Get-Content $armFile | ConvertFrom-Json
+          $json.resources = $json.resources | Where-Object {
+            $_.type -ne "Microsoft.DataFactory/factories/integrationRuntimes"
+          }
+          $json | ConvertTo-Json -Depth 100 | Set-Content $armFile
+
+    # 🚀 ARM Deployment
+    - task: AzureResourceManagerTemplateDeployment@3
+      displayName: Deploy ADF ARM Template
+      inputs:
+        deploymentScope: Resource Group
+        azureResourceManagerConnection: ${{ parameters.azureSubscription }}
+        action: Create Or Update Resource Group
+        resourceGroupName: ${{ parameters.resourceGroupName }}
+        location: ${{ parameters.location }}
+        templateLocation: Linked artifact
+        csmFile: '$(System.DefaultWorkingDirectory)/${{ parameters.armTemplatePath }}/ARMTemplateForFactory.json'
+        csmParametersFile: '$(System.DefaultWorkingDirectory)/${{ parameters.armTemplatePath }}/ARMTemplateParametersForFactory.json'
+        deploymentMode: Incremental
+        overrideParameters: |
+          -factoryName ${{ parameters.dataFactoryName }}
