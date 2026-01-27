@@ -1,0 +1,48 @@
+trigger: none
+
+variables:
+  armPath: 'adf/ARMTemplate'
+  location: 'East US'
+  azureSubscription: 'Azure-Service-Connection'
+
+stages:
+
+# 🔹 DEV
+- template: templates/adf-deploy-stage.yml
+  parameters:
+    stageName: Dev
+    azureSubscription: $(azureSubscription)
+    resourceGroupName: rg-adf-dev
+    dataFactoryName: adf-dev
+    location: $(location)
+    armTemplatePath: $(armPath)
+
+# 🔹 TEST
+- template: templates/adf-deploy-stage.yml
+  parameters:
+    stageName: Test
+    azureSubscription: $(azureSubscription)
+    resourceGroupName: rg-adf-test
+    dataFactoryName: adf-test
+    location: $(location)
+    armTemplatePath: $(armPath)
+
+# 🔹 UAT
+- template: templates/adf-deploy-stage.yml
+  parameters:
+    stageName: UAT
+    azureSubscription: $(azureSubscription)
+    resourceGroupName: rg-adf-uat
+    dataFactoryName: adf-uat
+    location: $(location)
+    armTemplatePath: $(armPath)
+
+# 🔹 PROD
+- template: templates/adf-deploy-stage.yml
+  parameters:
+    stageName: Prod
+    azureSubscription: $(azureSubscription)
+    resourceGroupName: rg-adf-prod
+    dataFactoryName: adf-prod
+    location: $(location)
+    armTemplatePath: $(armPath)
